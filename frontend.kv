@@ -1,0 +1,210 @@
+#: import Animation kivy.animation.Animation
+#: import cm kivy.metrics.cm
+#: import dp kivy.metrics.dp
+
+
+<MyTopAppBar@MDTopAppBar>:
+    # md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900']
+    title: "Location laka-laka"
+    right_action_items: [["dots-vertical", lambda x: app.goto+settings_screen()]]
+
+
+
+
+<MyToggleIconButton@MDIconButton>:
+    option: 's'
+    is_active: False
+    inactive_color: '#555555'
+    active_color: app.theme_cls.primary_color
+    size_hint: None, None
+    size: self.parent.width // 7, self.parent.height
+
+    theme_icon_color: "Custom"
+    icon_color: self.active_color if self.is_active else self.inactive_color
+    icon: f'alpha-{self.option}-circle' if self.is_active else f'alpha-{self.option}'
+
+    on_release:
+        self.is_active = not self.is_active
+
+
+
+<AlarmExpansionContent>:
+    id: main_parent
+    adaptive_height: True
+    padding: 15
+    canvas.before:
+        Color:
+            rgba: 0.2, 0.2, 0.2, 0.6
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+    BoxLayout:
+        size_hint_y: None
+        padding: dp(25)
+        spacing: dp(50)
+        height: self.minimum_height
+        orientation: 'vertical'
+
+        BoxLayout:
+            size_hint_y: None
+            height: self.minimum_height
+            spacing: 50
+            MDLabel:
+                text: 'Active state'
+                halign: 'right'
+            MDSwitch:
+                id: is_active
+        BoxLayout:
+            size_hint_y: None
+            height: self.minimum_height
+
+            MyToggleIconButton:
+                id: sun
+                option: 's'
+                inactive_color: '#cc5555'
+                # active_color: '#ff3333'
+            MyToggleIconButton:
+                id: mon
+                option: 'm'
+            MyToggleIconButton:
+                id: tue
+                option: 't'
+            MyToggleIconButton:
+                id: wed
+                option: 'w'
+            MyToggleIconButton:
+                id: thu
+                option: 't'
+            MyToggleIconButton:
+                id: fri
+                option: 'f'
+            MyToggleIconButton:
+                id: sat
+                option: 's'
+
+        BoxLayout:
+            size_hint_y: None
+            height: self.minimum_height
+            spacing: 50
+            MDIcon:
+                icon: 'bell'
+                pos_hint: {'center_y': 0.5}
+            MDLabel:
+                text: 'Sound alarm'
+            MDSwitch:
+                # size_hint: None, None
+                # size: self.size
+                icon_active: "check"
+                pos_hint: {'center_y': 0.5}
+
+        BoxLayout:
+            size_hint_y: None
+            height: self.minimum_height
+            spacing: 50
+            MDIcon:
+                icon: 'vibrate'
+                pos_hint: {'center_y': 0.5}
+            MDLabel:
+                text: 'Vibrate'
+            MDSwitch:
+                # size_hint: None, None
+                # size: self.size
+                icon_active: "check"
+                pos_hint: {'x': 0, 'center_y': 0.5}
+
+        BoxLayout:
+            size_hint_y: None
+            height: self.minimum_height
+            spacing: 50
+            MDIcon:
+                pos_hint: {'center_y': 0.5}
+                icon: 'radius-outline'
+            MDLabel:
+                text: 'Alarm radius'
+            BoxLayout:
+                spacing: 5
+                MDTextField:
+                    id: dist_inp
+                    mode: 'rectangle'
+                    text: '250'
+                    on_text:
+                        root.validate_alarm_distance(self.text, m_km_button.text.strip())
+                    on_focus:
+                        root.validate_alarm_distance(self.text, m_km_button.text.strip(), self.focus)
+
+                MDTextButton:
+                    id: m_km_button
+                    text: 'm    '
+                    on_release:
+                        root.open_menu()
+                    on_text:
+                        root.validate_alarm_distance(dist_inp.text, self.text.strip())
+
+        MDRectangleFlatIconButton:
+            icon: 'delete'
+            text: 'Remove'
+            pos_hint: {'center_x': 0.5, 'y': 0.05}
+            on_release:
+                root.remove()
+
+
+
+
+<AlarmsTab>:
+    MDBoxLayout:
+        orientation: 'vertical'
+        MyTopAppBar:
+            id: top_app_bar
+        ScrollView:
+            BoxLayout:
+                padding: 15, 10, 15, 0
+                spacing: 5
+                size_hint_y: None
+                orientation: 'vertical'
+                id: container
+                height: self.minimum_height
+
+
+
+<HomeScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        MDBottomNavigation:
+            id: bottom_navigation
+            panel_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900']
+            selected_color_background: app.theme_cls.accent_dark
+            text_color_active: "lightgrey"
+
+            MDBottomNavigationItem:
+                name: 'screen 1'
+                text: 'Active alarms'
+                icon: 'timer-marker-outline'
+
+                AlarmsTab:
+                    id: alarm_tab
+
+            MDBottomNavigationItem:
+                name: 'screen 2'
+                text: 'Google maps'
+                icon: 'google-maps'
+
+                MDLabel:
+                    text: 'Twitter'
+                    halign: 'center'
+
+            MDBottomNavigationItem:
+                name: 'screen 3'
+                text: 'Distance'
+                icon: 'map-marker-distance'
+
+                MDLabel:
+                    text: 'Distance'
+                    halign: 'center'
+                    on_touch_down:
+                        print(bottom_navigation.size[1])
+
+    MDFloatingActionButton:
+        id: spd_dial
+        icon: 'plus'
+        pos_hint: {'right': 0.95, 'y': dp(100) / root.height}
+        on_release: root.add_content()
