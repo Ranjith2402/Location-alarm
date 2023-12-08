@@ -20,6 +20,16 @@ class AlarmExpansionContent(MDBoxLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(args, kwargs)
         self.drop_down_menu = None
+        self.weeks = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+        self.refresh_week_buttons()
+
+    def refresh_week_buttons(self):
+        # on android, initially all buttons were texted as 's' by default
+        # this function eliminates it by refreshing all buttons
+        for week in self.weeks:
+            self.ids[week].is_active = True
+        for week in self.weeks:
+            self.ids[week].is_active = False
 
     def remove(self):
         self.parent.remove()
@@ -77,9 +87,19 @@ class AlarmExpansionPanel(MDExpansionPanel):
 
 
 class AlarmsTab(MDScreen):
-    def change_top_app_bar_color(self, _=None):
-        print('Start')
-        self.ids['top_app_bar'].md_bg_color = 1, 0, 0, 0
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.scroll_start_callback = lambda x=None: x
+
+    def scroll_start(self, args):
+        self.scroll_start_callback(args)
+
+    def change_top_app_bar_color(self, _=None, color=None):
+        if color is None:
+            self.ids['top_app_bar'].md_bg_color = app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '15'
+        else:
+            self.ids['top_app_bar'].md_bg_color = color
+        # self.ids['top_app_bar'].md_bg_color = 0.1, 0.1, 0.1, 0.8
 
     def add_active_alarms(self):
         self.ids['container'].add_widget(AlarmExpansionPanel(
@@ -93,9 +113,29 @@ class AlarmsTab(MDScreen):
 
 
 class HomeScreen(MDScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(args, kwargs)
+        self.is_test_scroll = True
+
+    def scroll_start(self, dist):
+        print(dist, self.is_test_scroll)
+        if self.is_test_scroll:
+            self.is_test_scroll = False
+            dist = 1
+        if dist == 1:
+            self.ids['alarm_tab'].change_top_app_bar_color(color=app.theme_cls.bg_normal)
+            self.ids['bottom_navigation'].panel_color = app.theme_cls.bg_normal
+        else:
+            self.ids['alarm_tab'].change_top_app_bar_color()
+            self.ids['bottom_navigation'].\
+                panel_color = app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '1a'
+
     def on_enter(self, *args):
-        pass
+        # pass
         # Clock.schedule_once(self.ids['alarm_tab'].change_top_app_bar_color, 0.1)
+        self.is_test_scroll = True
+        Clock.schedule_once(self.scroll_start, .1)
+        self.ids['alarm_tab'].scroll_start_callback = self.scroll_start
 
     def add_content(self):
         self.ids['alarm_tab'].add_active_alarms()
@@ -114,7 +154,7 @@ class MainApp(MDApp):
     def build(self):
         self.theme_cls.material_style = 'M3'
         self.theme_cls.theme_style = 'Dark'
-        self.theme_cls.primary_palette = 'Pink'
+        self.theme_cls.primary_palette = 'Teal'
         print(self.theme_cls.primary_palette)
         return sm
 

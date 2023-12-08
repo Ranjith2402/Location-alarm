@@ -38,6 +38,7 @@
         RoundedRectangle:
             pos: self.pos
             size: self.size
+            radius: dp(16),
     BoxLayout:
         size_hint_y: None
         padding: dp(25)
@@ -55,6 +56,7 @@
             MDSwitch:
                 id: is_active
         BoxLayout:
+            id: week_buttons
             size_hint_y: None
             height: self.minimum_height
 
@@ -124,9 +126,13 @@
             BoxLayout:
                 spacing: 5
                 MDTextField:
+                    size_hint_y: None
+                    height: '32dp'
                     id: dist_inp
-                    mode: 'rectangle'
+                    # mode: 'fill'
                     text: '250'
+                    halign: 'right'
+                    pos_hint: {'center_y': 0.5}
                     on_text:
                         root.validate_alarm_distance(self.text, m_km_button.text.strip())
                     on_focus:
@@ -156,6 +162,11 @@
         MyTopAppBar:
             id: top_app_bar
         ScrollView:
+            # on_scroll_start: root.scroll_start(self.scroll_y)
+            on_scroll_move: root.scroll_start(self.scroll_y)
+            on_scroll_stop: root.scroll_start(self.scroll_y)
+            always_overscroll: False
+            scroll_type: ['bars', 'content']
             BoxLayout:
                 padding: 15, 10, 15, 0
                 spacing: 5
@@ -171,7 +182,8 @@
         orientation: 'vertical'
         MDBottomNavigation:
             id: bottom_navigation
-            panel_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900']
+            # panel_color: 0.1, 0.1, 0.1, 0.8
+            panel_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '1a'
             selected_color_background: app.theme_cls.accent_dark
             text_color_active: "lightgrey"
 
@@ -206,5 +218,6 @@
     MDFloatingActionButton:
         id: spd_dial
         icon: 'plus'
+        md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900']
         pos_hint: {'right': 0.95, 'y': dp(100) / root.height}
         on_release: root.add_content()
