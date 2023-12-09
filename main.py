@@ -16,6 +16,14 @@ class CustomDropDownListItem(OneLineListItem):
     ...
 
 
+class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
+    def change_canvas_corner_radii(self):
+        self.radius = [dp(15), dp(15), 0, 0]
+
+    def reset_corner_radii(self):
+        self.radius = dp(15),
+
+
 class AlarmExpansionContent(MDBoxLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(args, kwargs)
@@ -77,6 +85,12 @@ class AlarmExpansionContent(MDBoxLayout):
 
 
 class AlarmExpansionPanel(MDExpansionPanel):
+    def on_open(self, *args):
+        self.panel_cls.change_canvas_corner_radii()
+
+    def on_close(self, *args):
+        self.panel_cls.reset_corner_radii()
+
     def remove(self):
         anim = Animation(x=-self.width, duration=0.4, t='out_back')
         anim.bind(on_complete=self._remove)
@@ -104,10 +118,10 @@ class AlarmsTab(MDScreen):
     def add_active_alarms(self):
         self.ids['container'].add_widget(AlarmExpansionPanel(
             content=AlarmExpansionContent(),
-            panel_cls=MDExpansionPanelThreeLine(
-                text='Bengaluru',
+            panel_cls=CustomExpansionPanelThreeLineListItem(
+                text='      Bengaluru',
                 secondary_text='                ',
-                tertiary_text='Sun, Mon, Fri'
+                tertiary_text='     Sun, Mon, Fri'
             ),
         ))
 
@@ -118,7 +132,6 @@ class HomeScreen(MDScreen):
         self.is_test_scroll = True
 
     def scroll_start(self, dist):
-        print(dist, self.is_test_scroll)
         if self.is_test_scroll:
             self.is_test_scroll = False
             dist = 1
@@ -127,7 +140,7 @@ class HomeScreen(MDScreen):
             self.ids['bottom_navigation'].panel_color = app.theme_cls.bg_normal
         else:
             self.ids['alarm_tab'].change_top_app_bar_color()
-            self.ids['bottom_navigation'].\
+            self.ids['bottom_navigation']. \
                 panel_color = app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '1a'
 
     def on_enter(self, *args):
@@ -155,7 +168,6 @@ class MainApp(MDApp):
         self.theme_cls.material_style = 'M3'
         self.theme_cls.theme_style = 'Dark'
         self.theme_cls.primary_palette = 'Teal'
-        print(self.theme_cls.primary_palette)
         return sm
 
 

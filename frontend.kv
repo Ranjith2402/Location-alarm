@@ -10,6 +10,12 @@
 
 
 
+<CustomExpansionPanelThreeLineListItem>:
+    bg_color: 0.2, 0.2, 0.2, 0.6
+    radius: dp(15)
+    divider_color: app.theme_cls.bg_normal
+
+
 
 <MyToggleIconButton@MDIconButton>:
     option: 's'
@@ -38,11 +44,11 @@
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: dp(16),
+            radius: 0, 0, dp(16), dp(16)
     BoxLayout:
         size_hint_y: None
-        padding: dp(25)
-        spacing: dp(50)
+        padding: dp(32)
+        spacing: dp(25)
         height: self.minimum_height
         orientation: 'vertical'
 
@@ -55,6 +61,7 @@
                 halign: 'right'
             MDSwitch:
                 id: is_active
+                pos_hint: {'y': -0.15}
         BoxLayout:
             id: week_buttons
             size_hint_y: None
@@ -97,7 +104,7 @@
                 # size_hint: None, None
                 # size: self.size
                 icon_active: "check"
-                pos_hint: {'center_y': 0.5}
+                pos_hint: {'y': -0.15}
 
         BoxLayout:
             size_hint_y: None
@@ -112,7 +119,7 @@
                 # size_hint: None, None
                 # size: self.size
                 icon_active: "check"
-                pos_hint: {'x': 0, 'center_y': 0.5}
+                pos_hint: {'y': -0.15}
 
         BoxLayout:
             size_hint_y: None
@@ -169,7 +176,7 @@
             scroll_type: ['bars', 'content']
             BoxLayout:
                 padding: 15, 10, 15, 0
-                spacing: 5
+                spacing: dp(18)
                 size_hint_y: None
                 orientation: 'vertical'
                 id: container
@@ -184,7 +191,7 @@
             id: bottom_navigation
             # panel_color: 0.1, 0.1, 0.1, 0.8
             panel_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '1a'
-            selected_color_background: app.theme_cls.accent_dark
+            selected_color_background: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '7f'
             text_color_active: "lightgrey"
 
             MDBottomNavigationItem:
