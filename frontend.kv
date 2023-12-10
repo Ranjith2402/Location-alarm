@@ -45,6 +45,10 @@
             pos: self.pos
             size: self.size
             radius: 0, 0, dp(16), dp(16)
+        # Color:
+        #     rgb: 0.05, 0.05, 0.05
+        # Line:
+        #     points: (self.x, self.top), (self.right, self.top)
     BoxLayout:
         size_hint_y: None
         padding: dp(32)
@@ -156,7 +160,10 @@
         MDRectangleFlatIconButton:
             icon: 'delete'
             text: 'Remove'
-            pos_hint: {'center_x': 0.5, 'y': 0.05}
+            pos_hint: {'right': 1, 'y': 0.05}
+            text_color: '#ff3333'
+            icon_color: self.text_color
+            line_color: self.text_color
             on_release:
                 root.remove()
 
@@ -170,17 +177,30 @@
             id: top_app_bar
         ScrollView:
             # on_scroll_start: root.scroll_start(self.scroll_y)
-            on_scroll_move: root.scroll_start(self.scroll_y)
-            on_scroll_stop: root.scroll_start(self.scroll_y)
+            # on_scroll_move: root.scroll_start(self.scroll_y)
+            # on_scroll_stop: root.scroll_start(self.scroll_y)
             always_overscroll: False
             scroll_type: ['bars', 'content']
             BoxLayout:
-                padding: 15, 10, 15, 0
-                spacing: dp(18)
+                padding: dp(15), dp(10), dp(15), dp(18)
+                spacing: dp(20)
                 size_hint_y: None
                 orientation: 'vertical'
                 id: container
                 height: self.minimum_height
+
+
+
+<GoogleMapsTab>:
+    MDRaisedButton:
+        text: 'Goto:\n \nGoogle Maps'
+        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+    MDRectangleFlatIconButton:
+        icon: 'hand-heart'
+        text: 'Support developer'
+        pos_hint: {'center_x': 0.5, 'center_y': 0.7}
+
+
 
 
 
@@ -207,9 +227,7 @@
                 text: 'Google maps'
                 icon: 'google-maps'
 
-                MDLabel:
-                    text: 'Twitter'
-                    halign: 'center'
+                GoogleMapsTab:
 
             MDBottomNavigationItem:
                 name: 'screen 3'

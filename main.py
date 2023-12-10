@@ -17,10 +17,14 @@ class CustomDropDownListItem(OneLineListItem):
 
 
 class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
+    is_open = False
+
     def change_canvas_corner_radii(self):
+        self.is_open = True
         self.radius = [dp(15), dp(15), 0, 0]
 
     def reset_corner_radii(self):
+        self.is_open = False
         self.radius = dp(15),
 
 
@@ -32,7 +36,7 @@ class AlarmExpansionContent(MDBoxLayout):
         self.refresh_week_buttons()
 
     def refresh_week_buttons(self):
-        # on android, initially all buttons were texted as 's' by default
+        # on android, initially all buttons were texted as 's' by default;
         # this function eliminates it by refreshing all buttons
         for week in self.weeks:
             self.ids[week].is_active = True
@@ -86,6 +90,11 @@ class AlarmExpansionContent(MDBoxLayout):
 
 class AlarmExpansionPanel(MDExpansionPanel):
     def on_open(self, *args):
+        for child in self.parent.children:  # on_close won't be called if we open another panel without closing opened
+            if child.panel_cls.is_open:
+                child.close_panel(child, None)
+                child.panel_cls.reset_corner_radii()
+                # don't break
         self.panel_cls.change_canvas_corner_radii()
 
     def on_close(self, *args):
@@ -126,6 +135,10 @@ class AlarmsTab(MDScreen):
         ))
 
 
+class GoogleMapsTab(MDScreen):
+    pass
+
+
 class HomeScreen(MDScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(args, kwargs)
@@ -145,10 +158,10 @@ class HomeScreen(MDScreen):
 
     def on_enter(self, *args):
         # pass
-        # Clock.schedule_once(self.ids['alarm_tab'].change_top_app_bar_color, 0.1)
+        Clock.schedule_once(self.ids['alarm_tab'].change_top_app_bar_color, 0.1)
         self.is_test_scroll = True
-        Clock.schedule_once(self.scroll_start, .1)
-        self.ids['alarm_tab'].scroll_start_callback = self.scroll_start
+        # Clock.schedule_once(self.scroll_start, .1)
+        # self.ids['alarm_tab'].scroll_start_callback = self.scroll_start
 
     def add_content(self):
         self.ids['alarm_tab'].add_active_alarms()
