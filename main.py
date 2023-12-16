@@ -3,7 +3,8 @@ from kivy.lang.builder import Builder
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
 from kivy.clock import Clock
-from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansionPanelThreeLine
+from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansionPanelThreeLine, \
+    MDExpansionPanelTwoLine, MDExpansionPanelLabel
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.list.list import OneLineListItem
 from kivymd.uix.menu.menu import MDDropdownMenu
@@ -18,6 +19,7 @@ class CustomDropDownListItem(OneLineListItem):
 
 class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
     is_open = False
+    _txt_left_pad = dp(15)
 
     def change_canvas_corner_radii(self):
         self.is_open = True
@@ -90,15 +92,45 @@ class AlarmExpansionContent(MDBoxLayout):
 
 class AlarmExpansionPanel(MDExpansionPanel):
     def on_open(self, *args):
-        for child in self.parent.children:  # on_close won't be called if we open another panel without closing opened
-            if child.panel_cls.is_open:
-                child.close_panel(child, None)
-                child.panel_cls.reset_corner_radii()
-                # don't break
+        # for child in self.parent.children:  # on_close won't be called if we open another panel without closing opened
+        #     child: AlarmExpansionPanel = child
+        #     if child.get_state() == 'open':
+        #         child.panel_cls.reset_corner_radii()
+        #         child.close_panel(child.parent, True)
         self.panel_cls.change_canvas_corner_radii()
+        self.open_panel()
 
     def on_close(self, *args):
         self.panel_cls.reset_corner_radii()
+
+    def check_open_panel(
+        self,
+        instance_panel: [
+            MDExpansionPanelThreeLine,
+            MDExpansionPanelTwoLine,
+            MDExpansionPanelThreeLine,
+            MDExpansionPanelLabel,
+        ],
+    ) -> None:
+        """
+        Called when you click on the panel. Called methods to open or close
+        a panel.
+        """
+
+        press_current_panel = False
+        for panel in self.parent.children:
+            if isinstance(panel, MDExpansionPanel):
+                if len(panel.children) == 2:
+                    if instance_panel is panel.children[1]:
+                        press_current_panel = True
+                    panel.remove_widget(panel.children[0])
+                    if not isinstance(self.panel_cls, MDExpansionPanelLabel):
+                        chevron = panel.children[0].children[0].children[0]
+                        self.set_chevron_up(chevron)
+                    self.close_panel(panel, press_current_panel)
+                    panel.dispatch("on_close")
+        if not press_current_panel:
+            self.set_chevron_down()
 
     def remove(self):
         anim = Animation(x=-self.width, duration=0.4, t='out_back')
@@ -113,6 +145,7 @@ class AlarmsTab(MDScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.scroll_start_callback = lambda x=None: x
+        self.expansion_items = []
 
     def scroll_start(self, args):
         self.scroll_start_callback(args)
@@ -125,18 +158,17 @@ class AlarmsTab(MDScreen):
         # self.ids['top_app_bar'].md_bg_color = 0.1, 0.1, 0.1, 0.8
 
     def add_active_alarms(self):
-        self.ids['container'].add_widget(AlarmExpansionPanel(
+        item = AlarmExpansionPanel(
             content=AlarmExpansionContent(),
             panel_cls=CustomExpansionPanelThreeLineListItem(
-                text='      Bengaluru',
+                text='Bengaluru',
                 secondary_text='                ',
-                tertiary_text='     Sun, Mon, Fri'
+                tertiary_text='Sun, Mon, Fri'
             ),
-        ))
+        )
 
-
-class GoogleMapsTab(MDScreen):
-    pass
+        self.expansion_items.append(item)
+        self.ids['container'].add_widget(item)
 
 
 class HomeScreen(MDScreen):
@@ -165,6 +197,10 @@ class HomeScreen(MDScreen):
 
     def add_content(self):
         self.ids['alarm_tab'].add_active_alarms()
+
+
+class GoogleMapsTab(MDScreen):
+    pass
 
 
 class MainApp(MDApp):

@@ -100,7 +100,7 @@
             height: self.minimum_height
             spacing: 50
             MDIcon:
-                icon: 'bell'
+                icon: 'bell-ring-outline'
                 pos_hint: {'center_y': 0.5}
             MDLabel:
                 text: 'Sound alarm'
@@ -175,11 +175,11 @@
         orientation: 'vertical'
         MyTopAppBar:
             id: top_app_bar
-        ScrollView:
+        MDScrollView:
             # on_scroll_start: root.scroll_start(self.scroll_y)
             # on_scroll_move: root.scroll_start(self.scroll_y)
             # on_scroll_stop: root.scroll_start(self.scroll_y)
-            always_overscroll: False
+            # always_overscroll: False
             scroll_type: ['bars', 'content']
             BoxLayout:
                 padding: dp(15), dp(10), dp(15), dp(18)
