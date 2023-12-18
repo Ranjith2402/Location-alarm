@@ -1,12 +1,61 @@
+#: import MDNavigationLayout kivymd.uix.navigationdrawer.MDNavigationLayout
 #: import Animation kivy.animation.Animation
 #: import cm kivy.metrics.cm
 #: import dp kivy.metrics.dp
 
 
+<NavigationDrawerItem@MDNavigationDrawerItem>:
+    on_release: self.parent.parent.parent.set_state('close')
+    icon_color: app.theme_cls.primary_light
+    text_color: app.theme_cls.opposite_bg_light if app.theme_cls.theme_style == "Light" else app.theme_cls.opposite_bg_dark
+    selected_color: app.theme_cls.primary_color
+
+
+<MyNavigationDrawerItem@MDNavigationDrawer>:
+    MDNavigationDrawerMenu:
+        radius: (0, 16, 16, 0)
+        MDNavigationDrawerHeader:
+            title: "Welcome"
+            # text: "Location alarm"
+            spacing: "4dp"
+            padding: "12dp" , 0, 0, "56dp"
+        #MDNavigationDrawerLabel:
+        #    text: ''
+        NavigationDrawerItem:
+            icon: 'cog'
+            text: 'Customise'
+            on_release:
+                app.root.current = 'settings'
+
+        MDNavigationDrawerDivider:
+        MDNavigationDrawerLabel:
+            text: 'Developer'
+        NavigationDrawerItem:
+            icon: "hand-heart"
+            text: "Support developer"
+        NavigationDrawerItem:
+            icon: "send"
+            text: "Send feedback"
+
+        MDNavigationDrawerDivider:
+        MDNavigationDrawerLabel:
+            text: 'Other'
+        NavigationDrawerItem:
+            icon: 'alert'
+            text: 'Error Log'
+            on_release: app.showcase('error log')
+
+        # MDNavigationDrawerDivider:
+        NavigationDrawerItem:
+            icon: 'help-circle'
+            text: 'Help'
+
+
+
 <MyTopAppBar@MDTopAppBar>:
-    # md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900']
+    md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '15'
     title: "Location laka-laka"
-    right_action_items: [["dots-vertical", lambda x: app.goto+settings_screen()]]
+    # right_action_items: [["dots-vertical", lambda x: self.parent.parent.parent.parent.parent.parent.parent.ids['nav_bar'].set_state('open')]]
 
 
 
@@ -14,6 +63,21 @@
     bg_color: 0.2, 0.2, 0.2, 0.6
     radius: dp(15)
     divider_color: app.theme_cls.bg_normal
+
+
+
+<ToolBar@MDNavigationLayout>:
+    MDScreenManager:
+        MDScreen:
+            MyTopAppBar:
+                id: top_app_bar
+                elevation: 3
+                pos_hint: {"top": 1}
+                right_action_items: [["dots-vertical", lambda x: nav_bar.set_state("open")]]
+
+    MyNavigationDrawerItem:
+        swipe_edge_width: '25dp'
+        id: nav_bar
 
 
 
@@ -188,6 +252,7 @@
                 orientation: 'vertical'
                 id: container
                 height: self.minimum_height
+    ToolBar:
 
 
 
@@ -246,3 +311,9 @@
         md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900']
         pos_hint: {'right': 0.95, 'y': dp(100) / root.height}
         on_release: root.add_content()
+
+
+<SettingsScreen>:
+    MDLabel:
+        text: 'Hell-o'
+

@@ -1,5 +1,6 @@
+import time
+
 from kivymd.app import MDApp
-from kivy.lang.builder import Builder
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
 from kivy.clock import Clock
@@ -8,9 +9,55 @@ from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansi
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.list.list import OneLineListItem
 from kivymd.uix.menu.menu import MDDropdownMenu
+from kivymd.toast import toast as _toast
+from kivymd.uix.transition.transition import MDFadeSlideTransition
+
+from kivy.lang.builder import Builder
 from kivy.animation import Animation
 from kivy.metrics import dp
-from kivy.core.window import WindowBase
+from kivy.core.window import WindowBase, EventLoop
+
+current_screen = previous_screen = 'home'
+
+
+def change_screen_to(screen: str) -> None:
+    global current_screen, previous_screen
+    previous_screen = current_screen
+    current_screen = screen
+    Clock.schedule_once(_set_screen, 0.1)
+
+
+def _set_screen(_):
+    sm.current = current_screen
+
+
+last_esc_down = 0
+
+
+def hook_keyboard(_, key, *__):
+    global last_esc_down
+    if key == 27:
+        if sm.current == 'settings':
+            change_screen_to('home')
+        else:
+            if time.time() - last_esc_down < 2.5:
+                return
+            last_esc_down = time.time()
+            toast('Press again to exit')
+        return True
+
+
+last_toast_msg = ''
+last_toast_time = time.time()
+
+
+def toast(msg: str):
+    global last_toast_msg, last_toast_time
+    if msg == last_toast_msg and time.time() - last_toast_time <= 2.5:
+        return
+    _toast(msg)
+    last_toast_time = time.time()
+    last_toast_msg = msg
 
 
 class CustomDropDownListItem(OneLineListItem):
@@ -104,13 +151,13 @@ class AlarmExpansionPanel(MDExpansionPanel):
         self.panel_cls.reset_corner_radii()
 
     def check_open_panel(
-        self,
-        instance_panel: [
-            MDExpansionPanelThreeLine,
-            MDExpansionPanelTwoLine,
-            MDExpansionPanelThreeLine,
-            MDExpansionPanelLabel,
-        ],
+            self,
+            instance_panel: [
+                MDExpansionPanelThreeLine,
+                MDExpansionPanelTwoLine,
+                MDExpansionPanelThreeLine,
+                MDExpansionPanelLabel,
+            ],
     ) -> None:
         """
         Called when you click on the panel. Called methods to open or close
@@ -150,13 +197,6 @@ class AlarmsTab(MDScreen):
     def scroll_start(self, args):
         self.scroll_start_callback(args)
 
-    def change_top_app_bar_color(self, _=None, color=None):
-        if color is None:
-            self.ids['top_app_bar'].md_bg_color = app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '15'
-        else:
-            self.ids['top_app_bar'].md_bg_color = color
-        # self.ids['top_app_bar'].md_bg_color = 0.1, 0.1, 0.1, 0.8
-
     def add_active_alarms(self):
         item = AlarmExpansionPanel(
             content=AlarmExpansionContent(),
@@ -171,26 +211,18 @@ class AlarmsTab(MDScreen):
         self.ids['container'].add_widget(item)
 
 
+class SettingsScreen(MDScreen):
+    pass
+
+
 class HomeScreen(MDScreen):
     def __init__(self, *args, **kwargs):
-        super().__init__(args, kwargs)
+        super().__init__(*args, **kwargs)
         self.is_test_scroll = True
-
-    def scroll_start(self, dist):
-        if self.is_test_scroll:
-            self.is_test_scroll = False
-            dist = 1
-        if dist == 1:
-            self.ids['alarm_tab'].change_top_app_bar_color(color=app.theme_cls.bg_normal)
-            self.ids['bottom_navigation'].panel_color = app.theme_cls.bg_normal
-        else:
-            self.ids['alarm_tab'].change_top_app_bar_color()
-            self.ids['bottom_navigation']. \
-                panel_color = app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '1a'
 
     def on_enter(self, *args):
         # pass
-        Clock.schedule_once(self.ids['alarm_tab'].change_top_app_bar_color, 0.1)
+        # Clock.schedule_once(self.ids['alarm_tab'].change_top_app_bar_color, 0.1)
         self.is_test_scroll = True
         # Clock.schedule_once(self.scroll_start, .1)
         # self.ids['alarm_tab'].scroll_start_callback = self.scroll_start
@@ -210,8 +242,13 @@ class MainApp(MDApp):
         'C++': 'language-cpp',
     }
 
+    @staticmethod
+    def goto_screen(screen: str):
+        change_screen_to(screen)
+
     def on_start(self):
         WindowBase.softinput_mode = 'pan'
+        EventLoop.window.bind(on_keyboard=hook_keyboard)
 
     def build(self):
         self.theme_cls.material_style = 'M3'
@@ -223,10 +260,12 @@ class MainApp(MDApp):
 if __name__ == '__main__':
     Builder.load_file('frontend.kv')
     app = MainApp()
-    sm = MDScreenManager()
+    sm = MDScreenManager(transition=MDFadeSlideTransition())
 
     home = HomeScreen(name='home')
+    settings = SettingsScreen(name='settings')
 
     sm.add_widget(home)
+    sm.add_widget(settings)
 
     app.run()
