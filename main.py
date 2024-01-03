@@ -1,17 +1,18 @@
 import time
 
+from kivymd.toast import toast as _toast
 from kivymd.app import MDApp
+from kivymd.uix.dialog import MDDialog
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
-from kivy.clock import Clock
-from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansionPanelThreeLine, \
-    MDExpansionPanelTwoLine, MDExpansionPanelLabel
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.list.list import OneLineListItem
 from kivymd.uix.menu.menu import MDDropdownMenu
-from kivymd.toast import toast as _toast
 from kivymd.uix.transition.transition import MDFadeSlideTransition
+from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansionPanelThreeLine, \
+    MDExpansionPanelTwoLine, MDExpansionPanelLabel
 
+from kivy.clock import Clock
 from kivy.lang.builder import Builder
 from kivy.animation import Animation
 from kivy.metrics import dp
@@ -37,7 +38,7 @@ last_esc_down = 0
 def hook_keyboard(_, key, *__):
     global last_esc_down
     if key == 27:
-        if sm.current == 'settings':
+        if sm.current in ('settings', 'locations'):
             change_screen_to('home')
         else:
             if time.time() - last_esc_down < 2.5:
@@ -58,6 +59,103 @@ def toast(msg: str):
     _toast(msg)
     last_toast_time = time.time()
     last_toast_msg = msg
+
+
+def validate_gps_cord(lat: str, lng: str) -> bool:
+    try:
+        lat = float(lat)
+        lng = float(lng)
+        if not (-90 <= lat <= 90):
+            return False
+        if not (-180 <= lng <= 180):
+            return False
+        return True
+    except ValueError:
+        return False
+
+
+def validate_alarm_distance(self, text, mode, focus=True):
+    if text == '' and not focus:
+        if mode == 'm':
+            least = 50
+        else:
+            least = 1
+        self.ids['dist_inp'].text = f'{least}'
+        return
+    try:
+        if mode == 'm':
+            d = int(text)
+            least = 50
+        else:
+            d = float(text)
+            least = 1
+        if d < least:
+            self.ids['dist_inp'].text = f'{least}'
+    except ValueError:
+        if text != '':
+            self.ids['dist_inp'].text = text[:-1]
+
+
+class WeeksToggleButtons(MDBoxLayout):
+    weeks = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+    def refresh_week_buttons(self):
+        for week in self.weeks:
+            self.ids[week].is_active = True
+        for week in self.weeks:
+            self.ids[week].is_active = False
+
+
+class AddNewLocationDialogContent(MDBoxLayout):
+    def __init__(self, *args, **kwargs):
+        super().__init__(args, kwargs)
+        self.drop_down_menu = None
+        self.weeks = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+        self.refresh_week_buttons()
+        
+    def refresh_week_buttons(self):
+        # on android, initially all buttons were texted as 's' by default;
+        # this function eliminates it by refreshing all buttons
+        self.ids['week_buttons'].refresh_week_buttons()
+
+    def validate_gps_cords(self):
+        if self.ids['cords_in'].focus:
+            return
+        txt = self.ids['cords_in'].text
+        if txt == '':
+            return
+        try:
+            lat, lng = txt.split(',')
+            self.ids['cords_in'].error = not validate_gps_cord(lat, lng)
+        except KeyError:
+            print('Key')
+        except TypeError:
+            print('Type')
+        except ValueError:
+            print('Value')
+        else:
+            return
+        self.ids['cords_in'].error = True
+
+    def open_menu(self):
+        menu = ['m', 'km']
+        menu_items = [
+            {
+                "text": menu_item,
+                "viewclass": 'CustomDropDownListItem',
+                "height": dp(54),
+                "on_release": lambda x=menu_item: self.set_drop_down_item(x),
+            } for menu_item in menu
+        ]
+
+        self.drop_down_menu = MDDropdownMenu(caller=self.ids['m_km_button'],
+                                             items=menu_items,
+                                             width_mult=2)
+        self.drop_down_menu.open()
+
+    def set_drop_down_item(self, opt):
+        self.ids['m_km_button'].text = opt
+        self.drop_down_menu.dismiss()
 
 
 class CustomDropDownListItem(OneLineListItem):
@@ -87,10 +185,7 @@ class AlarmExpansionContent(MDBoxLayout):
     def refresh_week_buttons(self):
         # on android, initially all buttons were texted as 's' by default;
         # this function eliminates it by refreshing all buttons
-        for week in self.weeks:
-            self.ids[week].is_active = True
-        for week in self.weeks:
-            self.ids[week].is_active = False
+        self.ids['week_buttons'].refresh_week_buttons()
 
     def remove(self):
         self.parent.remove()
@@ -211,6 +306,10 @@ class AlarmsTab(MDScreen):
         self.ids['container'].add_widget(item)
 
 
+class GoogleMapsTab(MDScreen):
+    pass
+
+
 class SettingsScreen(MDScreen):
     pass
 
@@ -231,8 +330,13 @@ class HomeScreen(MDScreen):
         self.ids['alarm_tab'].add_active_alarms()
 
 
-class GoogleMapsTab(MDScreen):
-    pass
+class SavedLocationsScreen(MDScreen):
+    @staticmethod
+    def add_new_location():
+        dialog = MDDialog(title=' ',
+                          type='custom',
+                          content_cls=AddNewLocationDialogContent())
+        dialog.open()
 
 
 class MainApp(MDApp):
@@ -264,8 +368,12 @@ if __name__ == '__main__':
 
     home = HomeScreen(name='home')
     settings = SettingsScreen(name='settings')
+    locations = SavedLocationsScreen(name='locations')
 
     sm.add_widget(home)
     sm.add_widget(settings)
+    sm.add_widget(locations)
+
+    sm.current = 'locations'
 
     app.run()

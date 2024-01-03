@@ -2,18 +2,22 @@
 #: import Animation kivy.animation.Animation
 #: import cm kivy.metrics.cm
 #: import dp kivy.metrics.dp
+#: import ScrollEffect kivy.effects.scroll.ScrollEffect
+#: import Clipboard kivy.core.clipboard.Clipboard
 
 
 <NavigationDrawerItem@MDNavigationDrawerItem>:
     on_release: self.parent.parent.parent.set_state('close')
     icon_color: app.theme_cls.primary_light
     text_color: app.theme_cls.opposite_bg_light if app.theme_cls.theme_style == "Light" else app.theme_cls.opposite_bg_dark
-    selected_color: app.theme_cls.primary_color
+    selected_color: app.theme_cls.primary_light
 
 
 <MyNavigationDrawerItem@MDNavigationDrawer>:
+    # anchor: 'right'
     MDNavigationDrawerMenu:
         radius: (0, 16, 16, 0)
+        effect_cls: ScrollEffect
         MDNavigationDrawerHeader:
             title: "Welcome"
             # text: "Location alarm"
@@ -21,6 +25,11 @@
             padding: "12dp" , 0, 0, "56dp"
         #MDNavigationDrawerLabel:
         #    text: ''
+        NavigationDrawerItem:
+            icon: 'map-marker-star'
+            text: 'Saved locations'
+            on_release:
+                app.root.current = 'locations'
         NavigationDrawerItem:
             icon: 'cog'
             text: 'Customise'
@@ -49,12 +58,25 @@
         NavigationDrawerItem:
             icon: 'help-circle'
             text: 'Help'
+#     MDBoxLayout:
+#         size_hint_y: None
+#         orientation: 'vertical'
+#         canvas:
+#             Color:
+#                 rgba: 0.4, 0.4, 0.4, 0.5
+#             Line:
+#                 points: (self.x, self.top), (self.right, self.top)
+#         MDLabel:
+#             size_hint_y: None
+#             height: self.texture_size[1]
+#             text: 'Hello'
+#             disabled: True
 
 
 
 <MyTopAppBar@MDTopAppBar>:
-    md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '15'
-    title: "Location laka-laka"
+    md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '00'
+    # title: "Location laka-laka"
     # right_action_items: [["dots-vertical", lambda x: self.parent.parent.parent.parent.parent.parent.parent.ids['nav_bar'].set_state('open')]]
 
 
@@ -69,10 +91,12 @@
 <ToolBar@MDNavigationLayout>:
     MDScreenManager:
         MDScreen:
-            MyTopAppBar:
+            MDTopAppBar:
                 id: top_app_bar
+                md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '15'
                 elevation: 3
                 pos_hint: {"top": 1}
+                title: 'Location laka-laka'
                 right_action_items: [["dots-vertical", lambda x: nav_bar.set_state("open")]]
 
     MyNavigationDrawerItem:
@@ -95,6 +119,38 @@
 
     on_release:
         self.is_active = not self.is_active
+
+
+<WeeksToggleButtons>:
+    size_hint: None, None
+    width: self.parent.width
+    height: self.minimum_height
+    pos_hint: {'center_x': 0.5}
+    # adaptive_width: True
+
+    MyToggleIconButton:
+        id: sun
+        option: 's'
+        inactive_color: '#cc5555'
+        # active_color: '#ff3333'
+    MyToggleIconButton:
+        id: mon
+        option: 'm'
+    MyToggleIconButton:
+        id: tue
+        option: 't'
+    MyToggleIconButton:
+        id: wed
+        option: 'w'
+    MyToggleIconButton:
+        id: thu
+        option: 't'
+    MyToggleIconButton:
+        id: fri
+        option: 'f'
+    MyToggleIconButton:
+        id: sat
+        option: 's'
 
 
 
@@ -130,34 +186,8 @@
             MDSwitch:
                 id: is_active
                 pos_hint: {'y': -0.15}
-        BoxLayout:
+        WeeksToggleButtons:
             id: week_buttons
-            size_hint_y: None
-            height: self.minimum_height
-
-            MyToggleIconButton:
-                id: sun
-                option: 's'
-                inactive_color: '#cc5555'
-                # active_color: '#ff3333'
-            MyToggleIconButton:
-                id: mon
-                option: 'm'
-            MyToggleIconButton:
-                id: tue
-                option: 't'
-            MyToggleIconButton:
-                id: wed
-                option: 'w'
-            MyToggleIconButton:
-                id: thu
-                option: 't'
-            MyToggleIconButton:
-                id: fri
-                option: 'f'
-            MyToggleIconButton:
-                id: sat
-                option: 's'
 
         BoxLayout:
             size_hint_y: None
@@ -252,7 +282,7 @@
                 orientation: 'vertical'
                 id: container
                 height: self.minimum_height
-    ToolBar:
+    # ToolBar:
 
 
 
@@ -311,9 +341,112 @@
         md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900']
         pos_hint: {'right': 0.95, 'y': dp(100) / root.height}
         on_release: root.add_content()
+    ToolBar:
+
 
 
 <SettingsScreen>:
     MDLabel:
         text: 'Hell-o'
+
+
+
+
+<AddNewLocationDialogContent>:
+    orientation: 'vertical'
+    size_hint_y: None
+    height: self.minimum_height
+    padding: dp(10)
+    spacing: dp(8)
+    MDLabel:
+        size_hint_y: None
+        height: self.texture_size[1]
+        text: 'Add reminder'
+        font_style: 'H5'
+    MDBoxLayout:
+        size_hint_y: None
+        height: self.minimum_height
+        spacing: dp(10)
+        MDTextField:
+            hint_text: 'GPS co-ords'
+            id: cords_in
+            on_focus: root.validate_gps_cords()
+            helper_text: 'Invalid GPS co-ordinates'
+            helper_text_mode: 'on_error'
+        MDIconButton:
+            text: 'Paste'
+            icon: 'content-paste'
+            pos_hint: {'right': 1}
+            on_release:
+                cords_in.text = Clipboard.paste()
+                root.validate_gps_cords()
+    MDBoxLayout:
+        size_hint_y: None
+        height: self.minimum_height
+        spacing: dp(10)
+        MDTextField:
+            hint_text: 'Location name'
+        MDRectangleFlatButton:
+            text: 'Get name'
+    MDLabel:
+        padding: 0, dp(30), 0, 0
+        text: 'Alarm radius'
+    MDBoxLayout:
+        padding: 10
+        spacing: 10
+        size_hint_y: None
+        height: self.minimum_height + dp(25)
+        MDSlider:
+            id: slider
+            hint: False
+            show_off: False
+            min: 50
+            max: 5000
+        MDTextFieldRect:
+            size_hint_x: None
+            width: dp(72)
+            id: max_time
+            _val: slider.value
+            text: str(int(self._val))
+            halign: 'left'
+            multiline: False
+            on_text:
+                slider.value = float(self.text) if self.focus else self._val
+        MDTextButton:
+            id: m_km_button
+            adaptive_width: True
+            text: 'm    '
+            pos_hint: {'center_y': 0.5}
+            on_release:
+                root.open_menu()
+    WeeksToggleButtons:
+        id: week_buttons
+    MDBoxLayout:
+        size_hint_y: None
+        height: self.minimum_height
+        padding: 0, '16dp', 0, '16dp'
+        MDTextButton:
+            text: 'Song.mp3'
+    MDRectangleFlatIconButton:
+        text: 'Add'
+        icon: 'plus'
+        pos_hint: {'center_x': 0.5}
+
+
+<SavedLocationsScreen>:
+    MDBoxLayout:
+        padding: dp(8)
+        MDScrollView:
+            MDBoxLayout:
+                orientation: 'vertical'
+                size_hint_y: None
+                id: container
+                height: self.minimum_height
+                MDRectangleFlatIconButton:
+                    icon: 'plus'
+                    text: 'Add'
+                    font_size: '32dp'
+                    pos_hint: {'center_x': 0.5}
+                    on_release: root.add_new_location()
+
 
