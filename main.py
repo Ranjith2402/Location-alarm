@@ -307,6 +307,25 @@ class AddNewLocationScreen(MDScreen):
     def on_enter(self):
         self.ids['ess_content'].refresh_week_buttons()
 
+    def validate_gps_cords(self):
+        if self.ids['cords_in'].focus:
+            return
+        txt = self.ids['cords_in'].text
+        if txt == '':
+            return
+        try:
+            lat, lng = txt.split(',')
+            self.ids['cords_in'].error = not validate_gps_cord(lat, lng)
+        except KeyError:
+            print('Key')
+        except TypeError:
+            print('Type')
+        except ValueError:
+            print('Value')
+        else:
+            return
+        self.ids['cords_in'].error = True
+
 
 class MainApp(MDApp):
     data = {
