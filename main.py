@@ -2,7 +2,6 @@ import time
 
 from kivymd.toast import toast as _toast
 from kivymd.app import MDApp
-from kivymd.uix.dialog import MDDialog
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -15,7 +14,7 @@ from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansi
 from kivy.clock import Clock
 from kivy.lang.builder import Builder
 from kivy.animation import Animation
-from kivy.metrics import dp
+from kivy.metrics import dp, sp
 from kivy.core.window import WindowBase, EventLoop
 
 current_screen = previous_screen = 'home'
@@ -38,7 +37,7 @@ last_esc_down = 0
 def hook_keyboard(_, key, *__):
     global last_esc_down
     if key == 27:
-        if sm.current in ('settings', 'locations'):
+        if sm.current in ('settings', 'saved_locations', 'new_location'):
             change_screen_to('home')
         else:
             if time.time() - last_esc_down < 2.5:
@@ -74,28 +73,6 @@ def validate_gps_cord(lat: str, lng: str) -> bool:
         return False
 
 
-def validate_alarm_distance(self, text, mode, focus=True):
-    if text == '' and not focus:
-        if mode == 'm':
-            least = 50
-        else:
-            least = 1
-        self.ids['dist_inp'].text = f'{least}'
-        return
-    try:
-        if mode == 'm':
-            d = int(text)
-            least = 50
-        else:
-            d = float(text)
-            least = 1
-        if d < least:
-            self.ids['dist_inp'].text = f'{least}'
-    except ValueError:
-        if text != '':
-            self.ids['dist_inp'].text = text[:-1]
-
-
 class WeeksToggleButtons(MDBoxLayout):
     weeks = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
@@ -106,36 +83,13 @@ class WeeksToggleButtons(MDBoxLayout):
             self.ids[week].is_active = False
 
 
-class AddNewLocationDialogContent(MDBoxLayout):
+class EssentialContent(MDBoxLayout):
     def __init__(self, *args, **kwargs):
-        super().__init__(args, kwargs)
+        super().__init__(args, **kwargs)
         self.drop_down_menu = None
-        self.weeks = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        self.refresh_week_buttons()
-        
-    def refresh_week_buttons(self):
-        # on android, initially all buttons were texted as 's' by default;
-        # this function eliminates it by refreshing all buttons
-        self.ids['week_buttons'].refresh_week_buttons()
 
-    def validate_gps_cords(self):
-        if self.ids['cords_in'].focus:
-            return
-        txt = self.ids['cords_in'].text
-        if txt == '':
-            return
-        try:
-            lat, lng = txt.split(',')
-            self.ids['cords_in'].error = not validate_gps_cord(lat, lng)
-        except KeyError:
-            print('Key')
-        except TypeError:
-            print('Type')
-        except ValueError:
-            print('Value')
-        else:
-            return
-        self.ids['cords_in'].error = True
+    def refresh_week_buttons(self):
+        self.ids['week_buttons'].refresh_week_buttons()
 
     def open_menu(self):
         menu = ['m', 'km']
@@ -165,6 +119,14 @@ class CustomDropDownListItem(OneLineListItem):
 class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
     is_open = False
     _txt_left_pad = dp(15)
+    # _height = NumericProperty(115)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.ids['_text_container'].spacing = dp(4)
+        self.ids['_lbl_secondary'].halign = 'right'
+        self.ids['_lbl_secondary'].valign = 'top'
 
     def change_canvas_corner_radii(self):
         self.is_open = True
@@ -185,51 +147,14 @@ class AlarmExpansionContent(MDBoxLayout):
     def refresh_week_buttons(self):
         # on android, initially all buttons were texted as 's' by default;
         # this function eliminates it by refreshing all buttons
-        self.ids['week_buttons'].refresh_week_buttons()
+        self.ids['ess_content'].refresh_week_buttons()
 
     def remove(self):
         self.parent.remove()
 
-    def open_menu(self):
-        menu = ['m', 'km']
-        menu_items = [
-            {
-                "text": menu_item,
-                "viewclass": 'CustomDropDownListItem',
-                "height": dp(54),
-                "on_release": lambda x=menu_item: self.set_drop_down_item(x),
-            } for menu_item in menu
-        ]
-
-        self.drop_down_menu = MDDropdownMenu(caller=self.ids['m_km_button'],
-                                             items=menu_items,
-                                             width_mult=2)
-        self.drop_down_menu.open()
-
     def set_drop_down_item(self, opt):
         self.ids['m_km_button'].text = opt
         self.drop_down_menu.dismiss()
-
-    def validate_alarm_distance(self, text, mode, focus=True):
-        if text == '' and not focus:
-            if mode == 'm':
-                least = 50
-            else:
-                least = 1
-            self.ids['dist_inp'].text = f'{least}'
-            return
-        try:
-            if mode == 'm':
-                d = int(text)
-                least = 50
-            else:
-                d = float(text)
-                least = 1
-            if d < least:
-                self.ids['dist_inp'].text = f'{least}'
-        except ValueError:
-            if text != '':
-                self.ids['dist_inp'].text = text[:-1]
 
 
 class AlarmExpansionPanel(MDExpansionPanel):
@@ -289,21 +214,23 @@ class AlarmsTab(MDScreen):
         self.scroll_start_callback = lambda x=None: x
         self.expansion_items = []
 
-    def scroll_start(self, args):
-        self.scroll_start_callback(args)
-
     def add_active_alarms(self):
         item = AlarmExpansionPanel(
             content=AlarmExpansionContent(),
             panel_cls=CustomExpansionPanelThreeLineListItem(
                 text='Bengaluru',
-                secondary_text='                ',
+                secondary_text='25km',
                 tertiary_text='Sun, Mon, Fri'
             ),
         )
 
         self.expansion_items.append(item)
         self.ids['container'].add_widget(item)
+
+    def scroll_move(self):
+        pass
+        # TODO: change top app bar color as scroll movement
+        # self.ids['top_app_bar'].color = *app.theme_cls.bg_normal, 1
 
 
 class GoogleMapsTab(MDScreen):
@@ -329,14 +256,53 @@ class HomeScreen(MDScreen):
     def add_content(self):
         self.ids['alarm_tab'].add_active_alarms()
 
+    @staticmethod
+    def tab_press(widget):
+        """Called when clicking on a panel item."""
+
+        bottom_navigation_object = widget.parent_widget
+        if bottom_navigation_object.previous_tab is not widget:
+            if bottom_navigation_object.previous_tab.index > widget.index:
+                bottom_navigation_object.ids.tab_manager.transition.direction = "right"
+            elif bottom_navigation_object.previous_tab.index < widget.index:
+                bottom_navigation_object.ids.tab_manager.transition.direction = "left"
+            # bottom_navigation_object.ids.tab_manager.current = widget.name
+            # bottom_navigation_object.previous_tab = widget
+
+        bottom_navigation_header_object = (
+            bottom_navigation_object.previous_tab.header
+        )
+        bottom_navigation_object.ids.tab_manager.current = widget.name
+
+        if bottom_navigation_object.previous_tab is not widget:
+            if bottom_navigation_object.use_text:
+                Animation(_label_font_size=sp(12), d=0.1).start(
+                    bottom_navigation_object.previous_tab.header
+                )
+            Animation(
+                _selected_region_width=0,
+                t="in_out_sine",
+                d=0,
+            ).start(bottom_navigation_header_object)
+            Animation(
+                _text_color_normal=bottom_navigation_header_object.text_color_normal
+                if bottom_navigation_object.previous_tab.header.text_color_normal != [1, 1, 1, 1]
+                else widget.theme_cls.disabled_hint_text_color,
+                d=0.1,
+            ).start(bottom_navigation_object.previous_tab.header)
+            bottom_navigation_object.previous_tab.header.active = False
+            widget.header.active = True
+        bottom_navigation_object.previous_tab = widget
+
 
 class SavedLocationsScreen(MDScreen):
-    @staticmethod
-    def add_new_location():
-        dialog = MDDialog(title=' ',
-                          type='custom',
-                          content_cls=AddNewLocationDialogContent())
-        dialog.open()
+    ...
+
+
+class AddNewLocationScreen(MDScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(args, **kwargs)
+        self.drop_down_menu = None
 
 
 class MainApp(MDApp):
@@ -349,6 +315,28 @@ class MainApp(MDApp):
     @staticmethod
     def goto_screen(screen: str):
         change_screen_to(screen)
+
+    @staticmethod
+    def validate_alarm_distance(root, text, mode, focus=True):
+        if text == '' and not focus:
+            if mode == 'm':
+                least = 50
+            else:
+                least = 1
+            root.ids['dist_inp'].text = f'{least}'
+            return
+        try:
+            if mode == 'm':
+                d = int(text)
+                least = 50
+            else:
+                d = float(text)
+                least = 1
+            if d < least:
+                root.ids['dist_inp'].text = f'{least}'
+        except ValueError:
+            if text != '':
+                root.ids['dist_inp'].text = text[:-1]
 
     def on_start(self):
         WindowBase.softinput_mode = 'pan'
@@ -368,12 +356,14 @@ if __name__ == '__main__':
 
     home = HomeScreen(name='home')
     settings = SettingsScreen(name='settings')
-    locations = SavedLocationsScreen(name='locations')
+    saved_locations = SavedLocationsScreen(name='saved_locations')
+    new_location = AddNewLocationScreen(name='new_location')
 
     sm.add_widget(home)
     sm.add_widget(settings)
-    sm.add_widget(locations)
+    sm.add_widget(saved_locations)
+    sm.add_widget(new_location)
 
-    sm.current = 'locations'
+    # sm.current = 'new_location'
 
     app.run()

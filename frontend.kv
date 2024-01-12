@@ -29,7 +29,7 @@
             icon: 'map-marker-star'
             text: 'Saved locations'
             on_release:
-                app.root.current = 'locations'
+                app.root.current = 'saved_locations'
         NavigationDrawerItem:
             icon: 'cog'
             text: 'Customise'
@@ -84,6 +84,7 @@
 <CustomExpansionPanelThreeLineListItem>:
     bg_color: 0.2, 0.2, 0.2, 0.6
     radius: dp(15)
+    font_style: 'H6'
     divider_color: app.theme_cls.bg_normal
 
 
@@ -154,6 +155,80 @@
 
 
 
+<EssentialContent>:
+    size_hint_y: None
+    spacing: dp(25)
+    padding: 0, 0, dp(25), 0
+    height: self.minimum_height
+    orientation: 'vertical'
+    WeeksToggleButtons:
+        id: week_buttons
+
+    BoxLayout:
+        size_hint_y: None
+        height: self.minimum_height
+        spacing: 50
+        MDIcon:
+            icon: 'bell-ring-outline'
+            pos_hint: {'center_y': 0.5}
+        MDLabel:
+            text: 'Sound alarm'
+        MDSwitch:
+            # size_hint: None, None
+            # size: self.size
+            icon_active: "check"
+            pos_hint: {'y': -0.15}
+
+    BoxLayout:
+        size_hint_y: None
+        height: self.minimum_height
+        spacing: 50
+        MDIcon:
+            icon: 'vibrate'
+            pos_hint: {'center_y': 0.5}
+        MDLabel:
+            text: 'Vibrate'
+        MDSwitch:
+            # size_hint: None, None
+            # size: self.size
+            icon_active: "check"
+            pos_hint: {'y': -0.15}
+
+    BoxLayout:
+        size_hint_y: None
+        height: self.minimum_height
+        spacing: 50
+        MDIcon:
+            pos_hint: {'center_y': 0.5}
+            icon: 'radius-outline'
+        MDLabel:
+            text: 'Alarm radius'
+        BoxLayout:
+            spacing: 5
+            MDTextField:
+                size_hint_y: None
+                height: '32dp'
+                id: dist_inp
+                # mode: 'fill'
+                text: '250'
+                halign: 'right'
+                pos_hint: {'center_y': 0.5}
+                on_text:
+                    app.validate_alarm_distance(root, self.text, m_km_button.text.strip())
+                on_focus:
+                    app.validate_alarm_distance(root, self.text, m_km_button.text.strip(), self.focus)
+
+            MDTextButton:
+                id: m_km_button
+                text: 'm    '
+                on_release:
+                    root.open_menu()
+                on_text:
+                    app.validate_alarm_distance(root, dist_inp.text, self.text.strip())
+
+
+
+
 <AlarmExpansionContent>:
     id: main_parent
     adaptive_height: True
@@ -175,10 +250,10 @@
         spacing: dp(25)
         height: self.minimum_height
         orientation: 'vertical'
-
         BoxLayout:
             size_hint_y: None
             height: self.minimum_height
+            padding: dp(25), -dp(25), dp(25), 0
             spacing: 50
             MDLabel:
                 text: 'Active state'
@@ -186,71 +261,8 @@
             MDSwitch:
                 id: is_active
                 pos_hint: {'y': -0.15}
-        WeeksToggleButtons:
-            id: week_buttons
-
-        BoxLayout:
-            size_hint_y: None
-            height: self.minimum_height
-            spacing: 50
-            MDIcon:
-                icon: 'bell-ring-outline'
-                pos_hint: {'center_y': 0.5}
-            MDLabel:
-                text: 'Sound alarm'
-            MDSwitch:
-                # size_hint: None, None
-                # size: self.size
-                icon_active: "check"
-                pos_hint: {'y': -0.15}
-
-        BoxLayout:
-            size_hint_y: None
-            height: self.minimum_height
-            spacing: 50
-            MDIcon:
-                icon: 'vibrate'
-                pos_hint: {'center_y': 0.5}
-            MDLabel:
-                text: 'Vibrate'
-            MDSwitch:
-                # size_hint: None, None
-                # size: self.size
-                icon_active: "check"
-                pos_hint: {'y': -0.15}
-
-        BoxLayout:
-            size_hint_y: None
-            height: self.minimum_height
-            spacing: 50
-            MDIcon:
-                pos_hint: {'center_y': 0.5}
-                icon: 'radius-outline'
-            MDLabel:
-                text: 'Alarm radius'
-            BoxLayout:
-                spacing: 5
-                MDTextField:
-                    size_hint_y: None
-                    height: '32dp'
-                    id: dist_inp
-                    # mode: 'fill'
-                    text: '250'
-                    halign: 'right'
-                    pos_hint: {'center_y': 0.5}
-                    on_text:
-                        root.validate_alarm_distance(self.text, m_km_button.text.strip())
-                    on_focus:
-                        root.validate_alarm_distance(self.text, m_km_button.text.strip(), self.focus)
-
-                MDTextButton:
-                    id: m_km_button
-                    text: 'm    '
-                    on_release:
-                        root.open_menu()
-                    on_text:
-                        root.validate_alarm_distance(dist_inp.text, self.text.strip())
-
+        EssentialContent:
+            id: ess_content
         MDRectangleFlatIconButton:
             icon: 'delete'
             text: 'Remove'
@@ -274,6 +286,7 @@
             # on_scroll_move: root.scroll_start(self.scroll_y)
             # on_scroll_stop: root.scroll_start(self.scroll_y)
             # always_overscroll: False
+            effect_cls: ScrollEffect
             scroll_type: ['bars', 'content']
             BoxLayout:
                 padding: dp(15), dp(10), dp(15), dp(18)
@@ -313,22 +326,19 @@
                 name: 'screen 1'
                 text: 'Active alarms'
                 icon: 'timer-marker-outline'
+                on_tab_press:
+                    root.tab_press(self)
 
                 AlarmsTab:
                     id: alarm_tab
 
-            MDBottomNavigationItem:
-                name: 'screen 2'
-                text: 'Google maps'
-                icon: 'google-maps'
-
-                GoogleMapsTab:
 
             MDBottomNavigationItem:
                 name: 'screen 3'
                 text: 'Distance'
                 icon: 'map-marker-distance'
-
+                on_tab_press:
+                    root.tab_press(self)
                 MDLabel:
                     text: 'Distance'
                     halign: 'center'
@@ -352,86 +362,6 @@
 
 
 
-<AddNewLocationDialogContent>:
-    orientation: 'vertical'
-    size_hint_y: None
-    height: self.minimum_height
-    padding: dp(10)
-    spacing: dp(8)
-    MDLabel:
-        size_hint_y: None
-        height: self.texture_size[1]
-        text: 'Add reminder'
-        font_style: 'H5'
-    MDBoxLayout:
-        size_hint_y: None
-        height: self.minimum_height
-        spacing: dp(10)
-        MDTextField:
-            hint_text: 'GPS co-ords'
-            id: cords_in
-            on_focus: root.validate_gps_cords()
-            helper_text: 'Invalid GPS co-ordinates'
-            helper_text_mode: 'on_error'
-        MDIconButton:
-            text: 'Paste'
-            icon: 'content-paste'
-            pos_hint: {'right': 1}
-            on_release:
-                cords_in.text = Clipboard.paste()
-                root.validate_gps_cords()
-    MDBoxLayout:
-        size_hint_y: None
-        height: self.minimum_height
-        spacing: dp(10)
-        MDTextField:
-            hint_text: 'Location name'
-        MDRectangleFlatButton:
-            text: 'Get name'
-    MDLabel:
-        padding: 0, dp(30), 0, 0
-        text: 'Alarm radius'
-    MDBoxLayout:
-        padding: 10
-        spacing: 10
-        size_hint_y: None
-        height: self.minimum_height + dp(25)
-        MDSlider:
-            id: slider
-            hint: False
-            show_off: False
-            min: 50
-            max: 5000
-        MDTextFieldRect:
-            size_hint_x: None
-            width: dp(72)
-            id: max_time
-            _val: slider.value
-            text: str(int(self._val))
-            halign: 'left'
-            multiline: False
-            on_text:
-                slider.value = float(self.text) if self.focus else self._val
-        MDTextButton:
-            id: m_km_button
-            adaptive_width: True
-            text: 'm    '
-            pos_hint: {'center_y': 0.5}
-            on_release:
-                root.open_menu()
-    WeeksToggleButtons:
-        id: week_buttons
-    MDBoxLayout:
-        size_hint_y: None
-        height: self.minimum_height
-        padding: 0, '16dp', 0, '16dp'
-        MDTextButton:
-            text: 'Song.mp3'
-    MDRectangleFlatIconButton:
-        text: 'Add'
-        icon: 'plus'
-        pos_hint: {'center_x': 0.5}
-
 
 <SavedLocationsScreen>:
     MDBoxLayout:
@@ -447,6 +377,67 @@
                     text: 'Add'
                     font_size: '32dp'
                     pos_hint: {'center_x': 0.5}
-                    on_release: root.add_new_location()
+                    on_release: app.goto_screen('new_location')
+
+
+
+<AddNewLocationScreen>:
+    MDBoxLayout:
+        orientation: 'vertical'
+        padding: '8dp'
+        spacing: '18dp'
+        MDLabel:
+            size_hint_y: None
+            height: self.texture_size[1]
+            text: 'Add reminder'
+            font_style: 'H5'
+            pos_hint: {'top': 0.98}
+            valign: 'top'
+        ScrollView:
+            MDBoxLayout:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: '24dp'
+                padding: '10dp'
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: dp(10)
+                    MDTextField:
+                        hint_text: 'GPS co-ords'
+                        id: cords_in
+                        on_focus: root.validate_gps_cords()
+                        helper_text: 'Invalid GPS co-ordinates'
+                        helper_text_mode: 'on_error'
+                    MDIconButton:
+                        text: 'Paste'
+                        icon: 'content-paste'
+                        pos_hint: {'right': 1}
+                        on_release:
+                            cords_in.text = Clipboard.paste()
+                            root.validate_gps_cords()
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: dp(10)
+                    padding: 0, 0, 0, dp(32)
+                    MDTextField:
+                        hint_text: 'Location name'
+                    MDRectangleFlatButton:
+                        text: 'Get name'
+                EssentialContent:
+                    id: content
+                    spacing: dp(32)
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: self.minimum_height
+                    padding: 0, '16dp', 0, '16dp'
+                    MDTextButton:
+                        text: 'Song.mp3'
+                MDRectangleFlatIconButton:
+                    text: 'Add'
+                    icon: 'plus'
+                    pos_hint: {'center_x': 0.5}
 
 
