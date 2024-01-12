@@ -332,6 +332,14 @@
                 AlarmsTab:
                     id: alarm_tab
 
+            MDBottomNavigationItem:
+                name: 'screen 2'
+                text: 'Google maps'
+                icon: 'google-maps'
+                on_tab_press:
+                    root.tab_press(self)
+
+                GoogleMapsTab:
 
             MDBottomNavigationItem:
                 name: 'screen 3'
@@ -427,7 +435,7 @@
                     MDRectangleFlatButton:
                         text: 'Get name'
                 EssentialContent:
-                    id: content
+                    id: ess_content
                     spacing: dp(32)
                 MDBoxLayout:
                     size_hint_y: None

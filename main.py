@@ -124,7 +124,7 @@ class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.ids['_text_container'].spacing = dp(4)
+        self.ids['_text_container'].spacing = dp(-3)
         self.ids['_lbl_secondary'].halign = 'right'
         self.ids['_lbl_secondary'].valign = 'top'
 
@@ -303,6 +303,9 @@ class AddNewLocationScreen(MDScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(args, **kwargs)
         self.drop_down_menu = None
+
+    def on_enter(self):
+        self.ids['ess_content'].refresh_week_buttons()
 
 
 class MainApp(MDApp):
