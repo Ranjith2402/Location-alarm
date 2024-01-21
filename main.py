@@ -1,3 +1,4 @@
+import re
 import time
 
 from kivymd.toast import toast as _toast
@@ -19,6 +20,10 @@ from kivy.core.window import WindowBase, EventLoop
 
 current_screen = previous_screen = 'home'
 
+decimal_regex_pattern = r'[+-]?\d+\.?\d+'  # r'[+-]?\d+\.\d+|[+-]?\d+'
+dms_regex_pattern_NEWS_format = r'\d+.\d+.\d+\.?\d+[NEWS]'
+dms_regex_pattern_sign_format = r'[+-]?\d+.\d+.\d+\.?\d+'
+
 
 def change_screen_to(screen: str) -> None:
     global current_screen, previous_screen
@@ -37,8 +42,10 @@ last_esc_down = 0
 def hook_keyboard(_, key, *__):
     global last_esc_down
     if key == 27:
-        if sm.current in ('settings', 'saved_locations', 'new_location'):
+        if sm.current in ('settings', 'saved_locations'):
             change_screen_to('home')
+        elif sm.current in ('new_location',):
+            change_screen_to(previous_screen)
         else:
             if time.time() - last_esc_down < 2.5:
                 return
@@ -60,15 +67,34 @@ def toast(msg: str):
     last_toast_msg = msg
 
 
+def split_gps_deci_str(string: str):
+    return re.findall(decimal_regex_pattern, string)
+
+
+def convert_gps_cords(deg, minute, sec, direction):
+    pass
+
+
+def validate_gps_co_ords(text: str) -> bool:
+    def get_format(txt: str) -> list:
+        out = [re.findall(pattern, txt) for pattern in [dms_regex_pattern_NEWS_format,
+                                                        dms_regex_pattern_sign_format,
+                                                        decimal_regex_pattern]]
+        print(out)
+        return out
+
+    form = get_format(text)
+
+    return True
+
+
 def validate_gps_cord(lat: str, lng: str) -> bool:
     try:
         lat = float(lat)
         lng = float(lng)
-        if not (-90 <= lat <= 90):
-            return False
-        if not (-180 <= lng <= 180):
-            return False
-        return True
+        if -90 <= lat <= 90 and -180 <= lng <= 180:
+            return True
+        return False
     except ValueError:
         return False
 
@@ -310,11 +336,14 @@ class AddNewLocationScreen(MDScreen):
     def validate_gps_cords(self):
         if self.ids['cords_in'].focus:
             return
-        txt = self.ids['cords_in'].text
+        txt = self.ids['cords_in'].text.upper()
         if txt == '':
             return
         try:
-            lat, lng = txt.split(',')
+            out = split_gps_deci_str(txt)
+            if len(out) != 2:
+                raise KeyError
+            lat, lng = out[0], out[1]
             self.ids['cords_in'].error = not validate_gps_cord(lat, lng)
         except KeyError:
             print('Key')
@@ -360,8 +389,15 @@ class MainApp(MDApp):
             if text != '':
                 root.ids['dist_inp'].text = text[:-1]
 
+    @staticmethod
+    def toast(message: str = ''):
+        toast(message)
+
     def on_start(self):
-        WindowBase.softinput_mode = 'pan'
+        WindowBase.softinput_mode = 'below_target'
+        WindowBase.on_maximize = lambda x=None: print(x, 'Hello')
+        WindowBase.on_restore = lambda x=None: print(x, 'hell')
+        # app.theme_cls.bg
         EventLoop.window.bind(on_keyboard=hook_keyboard)
 
     def build(self):

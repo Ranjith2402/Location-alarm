@@ -6,6 +6,13 @@
 #: import Clipboard kivy.core.clipboard.Clipboard
 
 
+
+<TooltipMDIconButton@MDIconButton+MDTooltip>:
+    tooltip_bg_color: '#262626ff'
+    tooltip_text_color: app.theme_cls.opposite_bg_light[:3] + [0.75]
+
+
+
 <NavigationDrawerItem@MDNavigationDrawerItem>:
     on_release: self.parent.parent.parent.set_state('close')
     icon_color: app.theme_cls.primary_light
@@ -29,12 +36,12 @@
             icon: 'map-marker-star'
             text: 'Saved locations'
             on_release:
-                app.root.current = 'saved_locations'
+                app.goto_screen('saved_locations')
         NavigationDrawerItem:
             icon: 'cog'
             text: 'Customise'
             on_release:
-                app.root.current = 'settings'
+                app.goto_screen('settings')
 
         MDNavigationDrawerDivider:
         MDNavigationDrawerLabel:
@@ -42,9 +49,11 @@
         NavigationDrawerItem:
             icon: "hand-heart"
             text: "Support developer"
+            on_release: app.toast('This feature still in development')
         NavigationDrawerItem:
             icon: "send"
             text: "Send feedback"
+            on_release: app.toast('This feature also in development')
 
         MDNavigationDrawerDivider:
         MDNavigationDrawerLabel:
@@ -52,12 +61,14 @@
         NavigationDrawerItem:
             icon: 'alert'
             text: 'Error Log'
-            on_release: app.showcase('error log')
+            on_release: app.toast('Even this feature is also in development')
 
         # MDNavigationDrawerDivider:
         NavigationDrawerItem:
             icon: 'help-circle'
             text: 'Help'
+            on_release: app.toast('This feature is not working')
+
 #     MDBoxLayout:
 #         size_hint_y: None
 #         orientation: 'vertical'
@@ -262,6 +273,7 @@
                 halign: 'right'
             MDSwitch:
                 id: is_active
+                icon_active: 'check'
                 pos_hint: {'y': -0.15}
         EssentialContent:
             id: ess_content
@@ -336,24 +348,31 @@
 
             MDBottomNavigationItem:
                 name: 'screen 2'
-                text: 'Google maps'
-                icon: 'google-maps'
-                on_tab_press:
-                    root.tab_press(self)
-
+                text: 'Where am I?'
+                icon: 'map-marker-radius'
+                on_tab_press: root.tab_press(self)
                 GoogleMapsTab:
 
-            MDBottomNavigationItem:
-                name: 'screen 3'
-                text: 'Distance'
-                icon: 'map-marker-distance'
-                on_tab_press:
-                    root.tab_press(self)
-                MDLabel:
-                    text: 'Distance'
-                    halign: 'center'
-                    on_touch_down:
-                        print(bottom_navigation.size[1])
+            # MDBottomNavigationItem:
+            #     name: 'screen 2'
+            #     text: 'Google maps'
+            #     icon: 'google-maps'
+            #     on_tab_press:
+            #         root.tab_press(self)
+
+            #     GoogleMapsTab:
+
+            # MDBottomNavigationItem:
+            #     name: 'screen 3'
+            #     text: 'Distance'
+            #     icon: 'map-marker-distance'
+            #     on_tab_press:
+            #         root.tab_press(self)
+            #     MDLabel:
+            #         text: 'Distance'
+            #         halign: 'center'
+            #         on_touch_down:
+            #             print(bottom_navigation.size[1])
 
     MDFloatingActionButton:
         id: spd_dial
@@ -420,9 +439,17 @@
                         on_focus: root.validate_gps_cords()
                         helper_text: 'Invalid GPS co-ordinates'
                         helper_text_mode: 'on_error'
-                    MDIconButton:
+                    TooltipMDIconButton:
                         text: 'Paste'
+                        tooltip_text: 'Paste from clipboard'
                         icon: 'content-paste'
+                        pos_hint: {'right': 1}
+                        on_release:
+                            cords_in.text = Clipboard.paste()
+                            root.validate_gps_cords()
+                    TooltipMDIconButton:
+                        icon: 'map-marker'
+                        tooltip_text: 'Current GPS location'
                         pos_hint: {'right': 1}
                         on_release:
                             cords_in.text = Clipboard.paste()
@@ -435,6 +462,7 @@
                     MDTextField:
                         hint_text: 'Location name'
                     MDRectangleFlatButton:
+                        pos_hint: {'center_y':0.5}
                         text: 'Get name'
                 EssentialContent:
                     id: ess_content
