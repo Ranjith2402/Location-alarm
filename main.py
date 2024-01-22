@@ -20,9 +20,9 @@ from kivy.core.window import WindowBase, EventLoop
 
 current_screen = previous_screen = 'home'
 
-decimal_regex_pattern = r'[+-]?\d+\.?\d+'  # r'[+-]?\d+\.\d+|[+-]?\d+'
-dms_regex_pattern_NEWS_format = r'\d+.\d+.\d+\.?\d+[NEWS]'
-dms_regex_pattern_sign_format = r'[+-]?\d+.\d+.\d+\.?\d+'
+decimal_regex_pattern = r'[+-]?\d+\.?\d*'  # r'[+-]?\d+\.\d+|[+-]?\d+'
+dms_regex_pattern_NEWS_format = r'\d+\D\d+\D\d+\.?\d*[NEWS]'
+dms_regex_pattern_sign_format = r'[+-]?\d+\D\d+\D\d+\.?\d*'
 
 
 def change_screen_to(screen: str) -> None:
@@ -67,25 +67,47 @@ def toast(msg: str):
     last_toast_msg = msg
 
 
-def split_gps_deci_str(string: str):
-    return re.findall(decimal_regex_pattern, string)
+def regex_match_gps(text: str) -> list:
+    """
+    Returns GPS co-ordinates in a given string
+    :param text: input string
+    :return: list of matching items,
+    three items -> NEWS (direction in the form of North, south, East or West)
+    two items -> hour-minute-sec format (direction in signed)
+    one item -> decimal format
+    empty list -> no match (not a valid sco-ords)
+    """
+    text = text.upper()
+    out = [re.findall(pattern, text) for pattern in [dms_regex_pattern_NEWS_format,
+                                                     dms_regex_pattern_sign_format,
+                                                     decimal_regex_pattern]]
+    print(out)
+    return out
 
 
-def convert_gps_cords(deg, minute, sec, direction):
-    pass
+def split_gps_deci_str(string: str) -> tuple:
+    out = re.findall(decimal_regex_pattern, string)
+    if string.startswith('-') or string.endswith('S') or string.endswith('W'):
+        direction = -1
+    else:
+        direction = 1
+    out = tuple(map(float, out))
+    return *out, direction
 
 
-def validate_gps_co_ords(text: str) -> bool:
-    def get_format(txt: str) -> list:
-        out = [re.findall(pattern, txt) for pattern in [dms_regex_pattern_NEWS_format,
-                                                        dms_regex_pattern_sign_format,
-                                                        decimal_regex_pattern]]
-        print(out)
-        return out
-
-    form = get_format(text)
-
-    return True
+def convert_gps_to_decimal_degree(deg: int, minute: int, sec: float, direction: int) -> float:
+    """
+    Converts GPS co-ordinates to decimal format
+    :param deg: degree
+    :param minute: minutes
+    :param sec: seconds
+    :param direction: direction
+    :return: decimal co-ordinate
+    """
+    out_deci = deg + minute / 60 + sec / 3600
+    if direction in ('W', 'S', '-', -1):
+        out_deci *= -1
+    return out_deci
 
 
 def validate_gps_cord(lat: str, lng: str) -> bool:
@@ -97,6 +119,29 @@ def validate_gps_cord(lat: str, lng: str) -> bool:
         return False
     except ValueError:
         return False
+
+
+def validate_gps_co_ords(text: str) -> bool:
+    regex_cords = regex_match_gps(text)
+    for ind, match in enumerate(regex_cords):
+        if match:
+            break
+    else:
+        return False
+    if len(match) != 2:
+        return False
+    if ind < 2:
+        split_lat = split_gps_deci_str(match[0])
+        split_lng = split_gps_deci_str(match[1])
+        if len(split_lat) == len(split_lng) == 4:
+            lat = convert_gps_to_decimal_degree(*split_lat)
+            lng = convert_gps_to_decimal_degree(*split_lng)
+        else:
+            return False
+    else:
+        lat, lng = match
+
+    return validate_gps_cord(lat, lng)
 
 
 class WeeksToggleButtons(MDBoxLayout):
@@ -190,8 +235,23 @@ class AlarmExpansionPanel(MDExpansionPanel):
         #     if child.get_state() == 'open':
         #         child.panel_cls.reset_corner_radii()
         #         child.close_panel(child.parent, True)
-        self.panel_cls.change_canvas_corner_radii()
         self.open_panel()
+        self.panel_cls.change_canvas_corner_radii()
+        Clock.schedule_once(self._focus, .1)
+
+    def _focus(self, *_):
+        self.parent.parent.scroll_to(widget=self)
+        Clock.schedule_once(self._modify_top_app_bar_color, 0.35)
+
+    # widget = self.content
+    # print(*widget.pos, *widget.size)
+    # pos = self.parent.to_widget(*widget.to_window(*widget.pos))
+    # cor = self.parent.to_widget(*widget.to_window(widget.right,
+    #                                               widget.top))
+    # print(self.panel_cls.height+self.height, pos, cor)
+
+    def _modify_top_app_bar_color(self, *_):
+        self.parent.parent.parent.parent.scroll_movement(self.parent.parent.scroll_y)
 
     def on_close(self, *args):
         self.panel_cls.reset_corner_radii()
@@ -231,7 +291,10 @@ class AlarmExpansionPanel(MDExpansionPanel):
         anim.start(self)
 
     def _remove(self, *_):
-        self.parent.remove_widget(self)
+        if self.parent.parent.scroll_y == 0:
+            self.parent.parent.scroll_y = (self.parent.parent.height - self.height) / self.parent.parent.height
+            # self.parent.parent.scroll_to(self.parent.children[0].panel_cls)
+        self.parent.remove_widget(self)  # goodbye
 
 
 class AlarmsTab(MDScreen):
@@ -253,10 +316,16 @@ class AlarmsTab(MDScreen):
         self.expansion_items.append(item)
         self.ids['container'].add_widget(item)
 
-    def scroll_move(self):
-        pass
-        # TODO: change top app bar color as scroll movement
-        # self.ids['top_app_bar'].color = *app.theme_cls.bg_normal, 1
+    def scroll_movement(self, *args):
+        # TODO_: change top app bar color as scroll movement
+        # pass
+        # print(args)
+        if args[0] >= 0.99:
+            color = app.theme_cls.bg_normal
+        else:
+            color = app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '1a'
+        # print(self.parent.parent.parent.parent.parent.ids, self.parent.parent.parent.parent.parent)
+        self.parent.parent.parent.parent.parent.change_top_app_bar_color(color=color)
 
 
 class GoogleMapsTab(MDScreen):
@@ -271,13 +340,24 @@ class HomeScreen(MDScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_test_scroll = True
+        self._color = None
 
     def on_enter(self, *args):
         # pass
         # Clock.schedule_once(self.ids['alarm_tab'].change_top_app_bar_color, 0.1)
         self.is_test_scroll = True
+
+        # self._color = app.theme_cls.bg_normal
+        Clock.schedule_once(self.change_top_app_bar_color, .1)
         # Clock.schedule_once(self.scroll_start, .1)
         # self.ids['alarm_tab'].scroll_start_callback = self.scroll_start
+
+    def change_top_app_bar_color(self, color=None):
+        return
+        # if isinstance(color, float):
+        #     color = self._color if self._color is not None else app.theme_cls.bg_normal
+        # self.ids['top_app_bar'].ids['top_app_bar'].md_bg_color = color
+        # self.ids['bottom_navigation'].panel_color = color
 
     def add_content(self):
         self.ids['alarm_tab'].add_active_alarms()
@@ -340,11 +420,11 @@ class AddNewLocationScreen(MDScreen):
         if txt == '':
             return
         try:
-            out = split_gps_deci_str(txt)
-            if len(out) != 2:
-                raise KeyError
-            lat, lng = out[0], out[1]
-            self.ids['cords_in'].error = not validate_gps_cord(lat, lng)
+            # out = split_gps_deci_str(txt)
+            # if len(out) != 2:
+            #     raise KeyError
+            # lat, lng = out[0], out[1]
+            self.ids['cords_in'].error = not validate_gps_co_ords(txt)
         except KeyError:
             print('Key')
         except TypeError:

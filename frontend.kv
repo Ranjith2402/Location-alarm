@@ -295,10 +295,13 @@
         orientation: 'vertical'
         MyTopAppBar:
             id: top_app_bar
-        MDScrollView:
-            # on_scroll_start: root.scroll_start(self.scroll_y)
-            # on_scroll_move: root.scroll_start(self.scroll_y)
-            # on_scroll_stop: root.scroll_start(self.scroll_y)
+            md_bg_color: 0, 0, 0, 0
+            text_color: 0, 0, 0, 0
+        ScrollView:
+            id: scroll_view
+            on_scroll_start: root.scroll_movement(self.scroll_y)
+            on_scroll_move: root.scroll_movement(self.scroll_y)
+            on_scroll_stop: root.scroll_movement(self.scroll_y)
             # always_overscroll: False
             effect_cls: ScrollEffect
             scroll_type: ['bars', 'content']
@@ -381,6 +384,7 @@
         pos_hint: {'right': 0.95, 'y': dp(100) / root.height}
         on_release: root.add_content()
     ToolBar:
+        id: top_app_bar
 
 
 
