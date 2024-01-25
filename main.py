@@ -239,22 +239,9 @@ class AlarmExpansionPanel(MDExpansionPanel):
         self.panel_cls.change_canvas_corner_radii()
         Clock.schedule_once(self._focus, .1)
 
-    def _focus(self, *_):
-        self.parent.parent.scroll_to(widget=self)
-        Clock.schedule_once(self._modify_top_app_bar_color, 0.35)
-
-    # widget = self.content
-    # print(*widget.pos, *widget.size)
-    # pos = self.parent.to_widget(*widget.to_window(*widget.pos))
-    # cor = self.parent.to_widget(*widget.to_window(widget.right,
-    #                                               widget.top))
-    # print(self.panel_cls.height+self.height, pos, cor)
-
-    def _modify_top_app_bar_color(self, *_):
-        self.parent.parent.parent.parent.scroll_movement(self.parent.parent.scroll_y)
-
     def on_close(self, *args):
         self.panel_cls.reset_corner_radii()
+        self._reset_scroll()
 
     def check_open_panel(
             self,
@@ -266,7 +253,7 @@ class AlarmExpansionPanel(MDExpansionPanel):
             ],
     ) -> None:
         """
-        Called when you click on the panel. Called methods to open or close
+        Called when you click on the panel.Called methods to open or close
         a panel.
         """
 
@@ -285,15 +272,37 @@ class AlarmExpansionPanel(MDExpansionPanel):
         if not press_current_panel:
             self.set_chevron_down()
 
+    def _reset_scroll(self):
+        if self.parent.parent.scroll_y == 0:
+            self.parent.parent.scroll_y = (self.parent.parent.height - self.height) / self.parent.parent.height
+            # self.parent.parent.scroll_to(self.parent.children[0].panel_cls)
+
+    def _focus(self, *_):
+        min_items = 1 + (app.root.height - (dp(100) + dp(80) + self.panel_cls.height + self.content.height)) //\
+                    self.panel_cls.height
+        if min_items < len(self.parent.children):
+            self.parent.parent.scroll_to(widget=self)
+        print(min_items)
+        # print(self.height, self.content.height, self.panel_cls.height, app.root.height, home.ids['top_app_bar'].pos)
+        Clock.schedule_once(self._modify_top_app_bar_color, 0.35)
+
+    # widget = self.content
+    # print(*widget.pos, *widget.size)
+    # pos = self.parent.to_widget(*widget.to_window(*widget.pos))
+    # cor = self.parent.to_widget(*widget.to_window(widget.right,
+    #                                               widget.top))
+    # print(self.panel_cls.height+self.height, pos, cor)
+
+    def _modify_top_app_bar_color(self, *_):
+        self.parent.parent.parent.parent.scroll_movement(self.parent.parent.scroll_y)
+
     def remove(self):
         anim = Animation(x=-self.width, duration=0.4, t='out_back')
         anim.bind(on_complete=self._remove)
         anim.start(self)
 
     def _remove(self, *_):
-        if self.parent.parent.scroll_y == 0:
-            self.parent.parent.scroll_y = (self.parent.parent.height - self.height) / self.parent.parent.height
-            # self.parent.parent.scroll_to(self.parent.children[0].panel_cls)
+        self._reset_scroll()
         self.parent.remove_widget(self)  # goodbye
 
 
@@ -302,6 +311,17 @@ class AlarmsTab(MDScreen):
         super().__init__(*args, **kwargs)
         self.scroll_start_callback = lambda x=None: x
         self.expansion_items = []
+        self.checker_clock = Clock.schedule_interval(self.check_scroll, 5)
+        # self.checker_clock.cancel()
+
+    def on__enter(self):
+        self.checker_clock()
+
+    def on__leave(self):
+        self.checker_clock.cancel()
+
+    def check_scroll(self, *_):
+        print(self.ids['scroll_view'].scroll_y)
 
     def add_active_alarms(self):
         item = AlarmExpansionPanel(
@@ -351,6 +371,11 @@ class HomeScreen(MDScreen):
         Clock.schedule_once(self.change_top_app_bar_color, .1)
         # Clock.schedule_once(self.scroll_start, .1)
         # self.ids['alarm_tab'].scroll_start_callback = self.scroll_start
+        if self.ids['bottom_navigation'].current == 'screen 1':
+            self.ids['alarm_tab'].on__enter()
+
+    def on_leave(self, *args):
+        self.ids['alarm_tab'].on__leave()
 
     def change_top_app_bar_color(self, color=None):
         return
