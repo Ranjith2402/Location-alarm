@@ -105,7 +105,7 @@
         MDScreen:
             MDTopAppBar:
                 id: top_app_bar
-                md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '15'
+                md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '24'
                 elevation: 3
                 pos_hint: {"top": 1}
                 title: 'Location laka-laka'
@@ -293,10 +293,13 @@
 <AlarmsTab>:
     MDBoxLayout:
         orientation: 'vertical'
-        MyTopAppBar:
-            id: top_app_bar
-            md_bg_color: 0, 0, 0, 0
-            text_color: 0, 0, 0, 0
+        # MyTopAppBar:
+        #     id: top_app_bar
+        #     md_bg_color: app.theme_cls.bg_normal
+        #     text_color: app.theme_cls.bg_normal
+        MDBoxLayout:
+            size_hint_y: None
+            height: dp(64)
         ScrollView:
             id: scroll_view
             on_scroll_start: root.scroll_movement(self.scroll_y)
@@ -335,7 +338,7 @@
         MDBottomNavigation:
             id: bottom_navigation
             # panel_color: 0.1, 0.1, 0.1, 0.8
-            panel_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '1a'
+            panel_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '25'
             selected_color_background: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '7f'
             text_color_active: "lightgrey"
 
@@ -345,6 +348,7 @@
                 icon: 'timer-marker-outline'
                 on_tab_press:
                     root.tab_press(self)
+                    alarm_tab.on__enter()
 
                 AlarmsTab:
                     id: alarm_tab
@@ -353,7 +357,9 @@
                 name: 'screen 2'
                 text: 'Where am I?'
                 icon: 'map-marker-radius'
-                on_tab_press: root.tab_press(self)
+                on_tab_press:
+                    root.tab_press(self)
+                    alarm_tab.on__leave()
                 GoogleMapsTab:
 
             # MDBottomNavigationItem:
