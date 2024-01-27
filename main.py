@@ -444,8 +444,10 @@ class HomeScreen(MDScreen):
     def show_tap_target(self):
         widget = MDTapTargetView(widget=self.ids['spd_dial'],
                                  title_text='Add new item',
-                                 description_text='This adds new items for active alarms\n'
-                                                  'This button may take long to respond\n'
+                                 description_text='This adds new items \n'
+                                                  'to active alarms\n'
+                                                  'This button may take\n'
+                                                  'long to respond.\n'
                                                   'So, don\'t spam this button',
                                  widget_position='right_bottom',
                                  cancelable=True, )
