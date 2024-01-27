@@ -6,11 +6,11 @@ from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.list.list import OneLineListItem
 from kivymd.uix.menu.menu import MDDropdownMenu
 from kivymd.uix.transition.transition import MDFadeSlideTransition
 from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansionPanelThreeLine, \
     MDExpansionPanelTwoLine, MDExpansionPanelLabel
+from kivymd.uix.taptargetview import MDTapTargetView
 
 from kivy.clock import Clock
 from kivy.lang.builder import Builder
@@ -20,11 +20,34 @@ from kivy.core.window import WindowBase, EventLoop
 
 current_screen = previous_screen = 'home'
 
+unsigned_float_pattern = r'\d+\.?\d*'
 decimal_regex_pattern = r'[+-]?\d+\.?\d*'  # r'[+-]?\d+\.\d+|[+-]?\d+'
 dms_regex_pattern_NEWS_format = r'\d+\D\d+\D\d+\.?\d*[NEWS]'
 dms_regex_pattern_sign_format = r'[+-]?\d+\D\d+\D\d+\.?\d*'
 
+fun_toast_messages = ['This feature is in development',
+                      'This feature also in development',
+                      'Even this feature is also in development',
+                      'This feature also is not working',
+                      'No, this won\'t work for now',
+                      'Thanks for testing but not works for now',
+                      'I\'m sleeping, see you later',
+                      'Available in next update',
+                      'This feature is still in development']
+fun_index = 0
+fun_ids = {}
+fun_again_press = [' ',
+                   ':) ',
+                   'I told you ',
+                   'Why are you trying to open it again and again, I told you ',
+                   'IMPORTANT: ',
+                   'Read this carefully: ',
+                   'Are you stupid or what, I told you ',
+                   '']
 
+
+# Kivy doesn't allow changing screen from outer thread other than kivy's
+# This function uses kivy's Clock to change screen
 def change_screen_to(screen: str) -> None:
     global current_screen, previous_screen
     previous_screen = current_screen
@@ -32,6 +55,7 @@ def change_screen_to(screen: str) -> None:
     Clock.schedule_once(_set_screen, 0.1)
 
 
+# Actual screen changing happens here
 def _set_screen(_):
     sm.current = current_screen
 
@@ -39,9 +63,10 @@ def _set_screen(_):
 last_esc_down = 0
 
 
+# Response every keystroke including esc button
 def hook_keyboard(_, key, *__):
     global last_esc_down
-    if key == 27:
+    if key == 27:  # Esc button on Windows and back button on Android
         if sm.current in ('settings', 'saved_locations'):
             change_screen_to('home')
         elif sm.current in ('new_location',):
@@ -86,7 +111,12 @@ def regex_match_gps(text: str) -> list:
 
 
 def split_gps_deci_str(string: str) -> tuple:
-    out = re.findall(decimal_regex_pattern, string)
+    """
+    Splits DMS string into separate integers and its direction
+    :param string: DMS input
+    :return: split text
+    """
+    out = re.findall(unsigned_float_pattern, string)
     if string.startswith('-') or string.endswith('S') or string.endswith('W'):
         direction = -1
     else:
@@ -111,6 +141,12 @@ def convert_gps_to_decimal_degree(deg: int, minute: int, sec: float, direction: 
 
 
 def validate_gps_cord(lat: str, lng: str) -> bool:
+    """
+    Checks weather the latitude and longitude is within range
+    :param lat: latitude
+    :param lng: longitude
+    :return: Boolean weather it's a valid co-ords
+    """
     try:
         lat = float(lat)
         lng = float(lng)
@@ -122,18 +158,31 @@ def validate_gps_cord(lat: str, lng: str) -> bool:
 
 
 def validate_gps_co_ords(text: str) -> bool:
+    """
+    Validates GPS co-ordinates of any format
+    :param text: Co-ordinates
+    :return: boolean; True if it is valid, else False
+    """
     regex_cords = regex_match_gps(text)
     for ind, match in enumerate(regex_cords):
         if match:
             break
     else:
         return False
-    if len(match) != 2:
+    if len(match) != 2:  # there are more or less items (2 -> 1 latitude and 1 longitude)
         return False
-    if ind < 2:
+    if ind < 2:  # Match index varies according to input format (<2 means It is in DMS format)
         split_lat = split_gps_deci_str(match[0])
         split_lng = split_gps_deci_str(match[1])
-        if len(split_lat) == len(split_lng) == 4:
+        if ind == 0:
+            # check the last letter
+            if match[0][-1] in ('S', 'N') and match[1][-1] in ('E', 'W'):
+                pass
+            elif match[0][-1] in ("E", "W") and match[1][-1] in ("N", "S"):
+                split_lat, split_lng = split_lng, split_lat  # latitude and longitude are swapped
+            else:
+                return False
+        if len(split_lat) == len(split_lng) == 4:  # 4 -> deg + min + sec + direction
             lat = convert_gps_to_decimal_degree(*split_lat)
             lng = convert_gps_to_decimal_degree(*split_lng)
         else:
@@ -148,6 +197,8 @@ class WeeksToggleButtons(MDBoxLayout):
     weeks = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
     def refresh_week_buttons(self):
+        # On android week buttons are not visible until they are pressed,
+        # This function will refresh and make visible
         for week in self.weeks:
             self.ids[week].is_active = True
         for week in self.weeks:
@@ -155,6 +206,7 @@ class WeeksToggleButtons(MDBoxLayout):
 
 
 class EssentialContent(MDBoxLayout):
+    # Contains common items
     def __init__(self, *args, **kwargs):
         super().__init__(args, **kwargs)
         self.drop_down_menu = None
@@ -183,13 +235,12 @@ class EssentialContent(MDBoxLayout):
         self.drop_down_menu.dismiss()
 
 
-class CustomDropDownListItem(OneLineListItem):
-    ...
-
-
 class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
+    # Expansion panel for alarm_tab
+
     is_open = False
     _txt_left_pad = dp(15)
+
     # _height = NumericProperty(115)
 
     def __init__(self, **kwargs):
@@ -209,6 +260,8 @@ class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
 
 
 class AlarmExpansionContent(MDBoxLayout):
+    # Content for expansion panel
+
     def __init__(self, *args, **kwargs):
         super().__init__(args, kwargs)
         self.drop_down_menu = None
@@ -229,6 +282,16 @@ class AlarmExpansionContent(MDBoxLayout):
 
 
 class AlarmExpansionPanel(MDExpansionPanel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.chevron.disabled = False
+        self.chevron._no_ripple_effect = True
+        # self.chevron.icon_color = self.chevron.disabled_color
+        self.chevron.bind(on_release=lambda x=None: self.toggle_panel(x))
+
+    def toggle_panel(self, _=None):
+        self.check_open_panel(self.panel_cls)
+
     def on_open(self, *args):
         # for child in self.parent.children:  # on_close won't be called if we open another panel without closing opened
         #     child: AlarmExpansionPanel = child
@@ -253,8 +316,8 @@ class AlarmExpansionPanel(MDExpansionPanel):
             ],
     ) -> None:
         """
-        Called when you click on the panel.Called methods to open or close
-        a panel.
+        Called when you click on the panel.
+        Called to open or close a panel.
         """
 
         press_current_panel = False
@@ -278,7 +341,7 @@ class AlarmExpansionPanel(MDExpansionPanel):
             # self.parent.parent.scroll_to(self.parent.children[0].panel_cls)
 
     def _focus(self, *_):
-        min_items = 1 + (app.root.height - (dp(100) + dp(80) + self.panel_cls.height + self.content.height)) //\
+        min_items = 1 + (app.root.height - (dp(100) + dp(80) + self.panel_cls.height + self.content.height)) // \
                     self.panel_cls.height
         if min_items < len(self.parent.children):
             self.parent.parent.scroll_to(widget=self)
@@ -353,7 +416,7 @@ class GoogleMapsTab(MDScreen):
 
 
 class SettingsScreen(MDScreen):
-    pass
+    ...
 
 
 class HomeScreen(MDScreen):
@@ -361,6 +424,7 @@ class HomeScreen(MDScreen):
         super().__init__(*args, **kwargs)
         self.is_test_scroll = True
         self._color = None
+        self.is_tap_target_shown = False
 
     def on_enter(self, *args):
         # pass
@@ -373,6 +437,20 @@ class HomeScreen(MDScreen):
         # self.ids['alarm_tab'].scroll_start_callback = self.scroll_start
         if self.ids['bottom_navigation'].current == 'screen 1':
             self.ids['alarm_tab'].on__enter()
+
+        if not self.is_tap_target_shown:
+            self.show_tap_target()
+
+    def show_tap_target(self):
+        widget = MDTapTargetView(widget=self.ids['spd_dial'],
+                                 title_text='Add new item',
+                                 description_text='This adds new items for active alarms\n'
+                                                  'This button may take long to respond\n'
+                                                  'So, don\'t spam this button',
+                                 widget_position='right_bottom',
+                                 cancelable=True, )
+        widget.start()
+        self.is_tap_target_shown = True
 
     def on_leave(self, *args):
         self.ids['alarm_tab'].on__leave()
@@ -389,7 +467,18 @@ class HomeScreen(MDScreen):
 
     @staticmethod
     def tab_press(widget):
-        """Called when clicking on a panel item."""
+        """
+        Called when clicking on a panel item.
+        Everything performed in this function
+        because: 1. built-in method overrides some functionalities of its parent
+                 2. Using on_tab_press again overrides its parent functionality,
+                    blocking everything except what we assign
+        So we perform what was supposed to happen
+        (Our main intention is to add directional scroll according to tab location,
+        which was previously unavailable due to the fact I explained in reason 1)
+        NOTE: Everything is copied from kivymd/uix/bottomnavigation/bottomavigation.py
+        basically this combines 2 functions
+        """
 
         bottom_navigation_object = widget.parent_widget
         if bottom_navigation_object.previous_tab is not widget:
@@ -427,10 +516,13 @@ class HomeScreen(MDScreen):
 
 
 class SavedLocationsScreen(MDScreen):
-    ...
+    """
+    Displays saved locations
+    """
 
 
 class AddNewLocationScreen(MDScreen):
+    # Provides interface to add new location
     def __init__(self, *args, **kwargs):
         super().__init__(args, **kwargs)
         self.drop_down_menu = None
@@ -457,19 +549,16 @@ class AddNewLocationScreen(MDScreen):
         except ValueError:
             print('Value')
         else:
+            # if no error
             return
         self.ids['cords_in'].error = True
 
 
 class MainApp(MDApp):
-    data = {
-        'Python': 'language-python',
-        'PHP': 'language-php',
-        'C++': 'language-cpp',
-    }
-
     @staticmethod
     def goto_screen(screen: str):
+        # Called from frontend.kv*
+        # Even though we can change screen there itself we need some function to use this method
         change_screen_to(screen)
 
     @staticmethod
@@ -495,7 +584,26 @@ class MainApp(MDApp):
                 root.ids['dist_inp'].text = text[:-1]
 
     @staticmethod
-    def toast(message: str = ''):
+    def toast(message: str = '', fun=False, id_=''):
+        global fun_index
+        if fun:
+            message = fun_toast_messages[fun_index]
+            if id_ in fun_ids:
+                message = fun_again_press[fun_ids[id_][1]]
+                fun_ids[id_][1] += 1
+                if fun_ids[id_][1] >= len(fun_again_press):
+                    fun_ids[id_][1] = len(fun_again_press) - 1
+                if fun_index + 1 != len(fun_toast_messages):
+                    if message == '':
+                        message = fun_toast_messages[-1]
+                    else:
+                        message += fun_toast_messages[fun_ids[id_][0]]
+            else:
+                fun_ids[id_] = [fun_index, 0]
+                fun_index += 1
+            if fun_index >= len(fun_toast_messages):
+                fun_index = len(fun_toast_messages) - 1
+            message = message.capitalize()
         toast(message)
 
     def on_start(self):

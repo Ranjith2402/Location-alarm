@@ -49,11 +49,11 @@
         NavigationDrawerItem:
             icon: "hand-heart"
             text: "Support developer"
-            on_release: app.toast('This feature still in development')
+            on_release: app.toast(fun=True, id_='1')
         NavigationDrawerItem:
             icon: "send"
             text: "Send feedback"
-            on_release: app.toast('This feature also in development')
+            on_release: app.toast(fun=True, id_='2')
 
         MDNavigationDrawerDivider:
         MDNavigationDrawerLabel:
@@ -61,13 +61,13 @@
         NavigationDrawerItem:
             icon: 'alert'
             text: 'Error Log'
-            on_release: app.toast('Even this feature is also in development')
+            on_release: app.toast(fun=True, id_='3')
 
         # MDNavigationDrawerDivider:
         NavigationDrawerItem:
             icon: 'help-circle'
             text: 'Help'
-            on_release: app.toast('This feature is not working')
+            on_release: app.toast(fun=True, id_='4')
 
 #     MDBoxLayout:
 #         size_hint_y: None
@@ -323,10 +323,12 @@
     MDRaisedButton:
         text: 'Goto:\n \nGoogle Maps'
         pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+        on_release: app.toast(fun=True, id_='5')
     MDRectangleFlatIconButton:
         icon: 'hand-heart'
         text: 'Support developer'
         pos_hint: {'center_x': 0.5, 'center_y': 0.7}
+        on_release: app.toast('Thank you from bottom my heart but this is not working for now')
 
 
 
@@ -389,6 +391,11 @@
         md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900']
         pos_hint: {'right': 0.95, 'y': dp(100) / root.height}
         on_release: root.add_content()
+        _soft_shadow_size: self.soft_shadow_size
+        _soft_shadow_pos: self.soft_shadow_pos
+        _hard_shadow_texture: self.hard_shadow_texture
+        _hard_shadow_size: self.hard_shadow_size
+        _hard_shadow_pos: self.hard_shadow_pos
     ToolBar:
         id: top_app_bar
 
@@ -462,8 +469,8 @@
                         tooltip_text: 'Current GPS location'
                         pos_hint: {'right': 1}
                         on_release:
-                            cords_in.text = Clipboard.paste()
-                            root.validate_gps_cords()
+                            cords_in.text = "This feature is still in development"
+                            # root.validate_gps_cords()
                 MDBoxLayout:
                     size_hint_y: None
                     height: self.minimum_height
@@ -474,6 +481,7 @@
                     MDRectangleFlatButton:
                         pos_hint: {'center_y':0.5}
                         text: 'Get name'
+                        on_release: app.toast(fun=True, id_='6')
                 EssentialContent:
                     id: ess_content
                     spacing: dp(32)
@@ -483,9 +491,11 @@
                     padding: 0, '16dp', 0, '16dp'
                     MDTextButton:
                         text: 'Song.mp3'
+                        on_release: app.toast(fun=True, id_='7')
                 MDRectangleFlatIconButton:
                     text: 'Add'
                     icon: 'plus'
                     pos_hint: {'center_x': 0.5}
+                    on_release: app.toast(fun=True, id_='8')
 
 
