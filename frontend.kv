@@ -403,7 +403,8 @@
 
 <SettingsScreen>:
     MDLabel:
-        text: 'Hell-o'
+        text: 'Settings are on the way, will arrive soon...'
+        halign: 'center'
 
 
 
@@ -470,7 +471,7 @@
                         pos_hint: {'right': 1}
                         on_release:
                             cords_in.text = "This feature is still in development"
-                            # root.validate_gps_cords()
+                            root.validate_gps_cords()
                 MDBoxLayout:
                     size_hint_y: None
                     height: self.minimum_height

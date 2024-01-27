@@ -42,7 +42,8 @@ fun_again_press = [' ',
                    'Why are you trying to open it again and again, I told you ',
                    'IMPORTANT: ',
                    'Read this carefully: ',
-                   'Are you stupid or what, I told you ',
+                   'This is last time: ',
+                   ':(',
                    '']
 
 
