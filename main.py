@@ -448,7 +448,8 @@ class HomeScreen(MDScreen):
                                                   'to active alarms\n'
                                                   'This button may take\n'
                                                   'long to respond.\n'
-                                                  'So, don\'t spam this button',
+                                                  'So, don\'t spam this button\n'
+                                                  'Add items one by one',
                                  widget_position='right_bottom',
                                  cancelable=True, )
         widget.start()
