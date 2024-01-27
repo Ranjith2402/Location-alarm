@@ -3,6 +3,7 @@ import time
 
 from kivymd.toast import toast as _toast
 from kivymd.app import MDApp
+from kivymd.uix.list import OneLineListItem
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -234,6 +235,10 @@ class EssentialContent(MDBoxLayout):
     def set_drop_down_item(self, opt):
         self.ids['m_km_button'].text = opt
         self.drop_down_menu.dismiss()
+
+
+class CustomDropDownListItem(OneLineListItem):
+    ...
 
 
 class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
