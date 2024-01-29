@@ -1,3 +1,5 @@
+__version__: str = '1.2.5.5'
+
 import re
 import time
 
@@ -85,7 +87,7 @@ last_toast_msg = ''
 last_toast_time = time.time()
 
 
-def toast(msg: str):
+def toast(msg: str) -> None:
     global last_toast_msg, last_toast_time
     if msg == last_toast_msg and time.time() - last_toast_time <= 2.5:
         return
@@ -564,6 +566,8 @@ class AddNewLocationScreen(MDScreen):
 
 
 class MainApp(MDApp):
+    version = f'ver: {__version__}'
+
     @staticmethod
     def goto_screen(screen: str):
         # Called from frontend.kv*

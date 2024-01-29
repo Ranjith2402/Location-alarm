@@ -22,6 +22,7 @@
 
 <MyNavigationDrawerItem@MDNavigationDrawer>:
     # anchor: 'right'
+    orientation: 'vertical'
     MDNavigationDrawerMenu:
         radius: (0, 16, 16, 0)
         effect_cls: ScrollEffect
@@ -69,19 +70,22 @@
             text: 'Help'
             on_release: app.toast(fun=True, id_='4')
 
-#     MDBoxLayout:
-#         size_hint_y: None
-#         orientation: 'vertical'
-#         canvas:
-#             Color:
-#                 rgba: 0.4, 0.4, 0.4, 0.5
-#             Line:
-#                 points: (self.x, self.top), (self.right, self.top)
-#         MDLabel:
-#             size_hint_y: None
-#             height: self.texture_size[1]
-#             text: 'Hello'
-#             disabled: True
+    MDBoxLayout:
+        size_hint_y: None
+        orientation: 'vertical'
+        height: self.minimum_height
+        canvas:
+            Color:
+                rgba: 0.4, 0.4, 0.4, 0.5
+            Line:
+                points: (self.x, self.top), (self.right, self.top)
+        MDLabel:
+            size_hint_y: None
+            padding: '5dp'
+            height: self.texture_size[1]
+            text: app.version
+            disabled: True
+            halign: 'center'
 
 
 
