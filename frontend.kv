@@ -74,14 +74,14 @@
         size_hint_y: None
         orientation: 'vertical'
         height: self.minimum_height
-        canvas:
+        padding: 0, '10dp', 0, 0
+        canvas.before:
             Color:
                 rgba: 0.4, 0.4, 0.4, 0.5
             Line:
                 points: (self.x, self.top), (self.right, self.top)
         MDLabel:
             size_hint_y: None
-            padding: '5dp'
             height: self.texture_size[1]
             text: app.version
             disabled: True
@@ -327,7 +327,9 @@
     MDRaisedButton:
         text: 'Goto:\n \nGoogle Maps'
         pos_hint: {'center_x': 0.5, 'center_y': 0.5}
-        on_release: app.toast(fun=True, id_='5')
+        on_release:
+            app.open_url('https://maps.google.com/')
+            # app.toast(fun=True, id_='5')
     MDRectangleFlatIconButton:
         icon: 'hand-heart'
         text: 'Support developer'
@@ -395,11 +397,13 @@
         md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900']
         pos_hint: {'right': 0.95, 'y': dp(100) / root.height}
         on_release: root.add_content()
+
         _soft_shadow_size: self.soft_shadow_size
         _soft_shadow_pos: self.soft_shadow_pos
         _hard_shadow_texture: self.hard_shadow_texture
         _hard_shadow_size: self.hard_shadow_size
         _hard_shadow_pos: self.hard_shadow_pos
+
     ToolBar:
         id: top_app_bar
 
@@ -429,6 +433,9 @@
                     font_size: '32dp'
                     pos_hint: {'center_x': 0.5}
                     on_release: app.goto_screen('new_location')
+    MDLabel:
+        text: 'Saved locations will appear here'
+        halign: 'center'
 
 
 

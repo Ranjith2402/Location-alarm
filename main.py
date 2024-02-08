@@ -1,24 +1,25 @@
-__version__: str = '1.2.5.5'
+__version__: str = '1.2.6'
 
 import re
 import time
+import webbrowser
 
-from kivymd.toast import toast as _toast
 from kivymd.app import MDApp
-from kivymd.uix.list import OneLineListItem
+from kivymd.toast import toast as _toast
 from kivymd.uix.screen import MDScreen
-from kivymd.uix.screenmanager import MDScreenManager
+from kivymd.uix.list import OneLineListItem
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.menu.menu import MDDropdownMenu
+from kivymd.uix.screenmanager import MDScreenManager
+from kivymd.uix.taptargetview import MDTapTargetView
 from kivymd.uix.transition.transition import MDFadeSlideTransition
 from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansionPanelThreeLine, \
     MDExpansionPanelTwoLine, MDExpansionPanelLabel
-from kivymd.uix.taptargetview import MDTapTargetView
 
 from kivy.clock import Clock
-from kivy.lang.builder import Builder
-from kivy.animation import Animation
 from kivy.metrics import dp, sp
+from kivy.animation import Animation
+from kivy.lang.builder import Builder
 from kivy.core.window import WindowBase, EventLoop
 
 current_screen = previous_screen = 'home'
@@ -28,26 +29,28 @@ decimal_regex_pattern = r'[+-]?\d+\.?\d*'  # r'[+-]?\d+\.\d+|[+-]?\d+'
 dms_regex_pattern_NEWS_format = r'\d+\D\d+\D\d+\.?\d*[NEWS]'
 dms_regex_pattern_sign_format = r'[+-]?\d+\D\d+\D\d+\.?\d*'
 
-fun_toast_messages = ['This feature is in development',
-                      'This feature also in development',
-                      'Even this feature is also in development',
-                      'This feature also is not working',
-                      'No, this won\'t work for now',
-                      'Thanks for testing but not works for now',
-                      'I\'m sleeping, see you later',
-                      'Available in next update',
-                      'This feature is still in development']
+fun_toast_messages = [
+    'This feature is in development',
+    'This feature also in development',
+    'Even this feature is also in development',
+    'This feature also is not working',
+    'No, this won\'t work for now',
+    'Thanks for testing but not works for now',
+    'I\'m sleeping, see you later',
+    'Available in next update',
+    'This feature is still in development']
 fun_index = 0
 fun_ids = {}
-fun_again_press = [' ',
-                   ':) ',
-                   'I told you ',
-                   'Why are you trying to open it again and again, I told you ',
-                   'IMPORTANT: ',
-                   'Read this carefully: ',
-                   'This is last time: ',
-                   ':(',
-                   '']
+fun_again_press = [
+    ' ',
+    ':) ',
+    'I told you ',
+    'Why are you trying to open it again and again, I told you ',
+    'IMPORTANT: ',
+    'Read this carefully: ',
+    'This is last time: ',
+    ':(',
+    '']
 
 
 # Kivy doesn't allow changing screen from outer thread other than kivy's
@@ -146,10 +149,10 @@ def convert_gps_to_decimal_degree(deg: int, minute: int, sec: float, direction: 
 
 def validate_gps_cord(lat: str, lng: str) -> bool:
     """
-    Checks weather the latitude and longitude is within range
+    Checks whether the latitude and longitude is within range
     :param lat: latitude
     :param lng: longitude
-    :return: Boolean weather it's a valid co-ords
+    :return: Boolean whether it's a valid co-ords or not
     """
     try:
         lat = float(lat)
@@ -174,12 +177,17 @@ def validate_gps_co_ords(text: str) -> bool:
     else:
         return False
     if len(match) != 2:  # there are more or less items (2 -> 1 latitude and 1 longitude)
-        return False
+        if ind == 1 and len(match) == 1 and len(regex_cords[-1]) == 2:  # This case will solve problem like
+            # '12.34 56.78' this is GPS co-ord in decimal from, but it also matches with DMS of sign format
+            ind = 2
+            match: list = regex_cords[-1]
+        else:
+            return False
     if ind < 2:  # Match index varies according to input format (<2 means It is in DMS format)
         split_lat = split_gps_deci_str(match[0])
         split_lng = split_gps_deci_str(match[1])
         if ind == 0:
-            # check the last letter
+            # check the last letter, In-case they are swapped
             if match[0][-1] in ('S', 'N') and match[1][-1] in ('E', 'W'):
                 pass
             elif match[0][-1] in ("E", "W") and match[1][-1] in ("N", "S"):
@@ -400,7 +408,7 @@ class AlarmsTab(MDScreen):
             panel_cls=CustomExpansionPanelThreeLineListItem(
                 text='Bengaluru',
                 secondary_text='25km',
-                tertiary_text='Sun, Mon, Fri'
+                tertiary_text=', '.join(map(lambda x: x.capitalize(), ['sun', 'mon', 'fri']))
             ),
         )
 
@@ -447,19 +455,21 @@ class HomeScreen(MDScreen):
             self.ids['alarm_tab'].on__enter()
 
         if not self.is_tap_target_shown:
-            self.show_tap_target()
+            Clock.schedule_once(self.show_tap_target, 0.1)
 
-    def show_tap_target(self):
+    def show_tap_target(self, _=None):
         widget = MDTapTargetView(widget=self.ids['spd_dial'],
                                  title_text='Add new item',
                                  description_text='This adds new items \n'
-                                                  'to active alarms\n'
+                                                  'to active alarms tab\n'
                                                   'This button may take\n'
                                                   'long to respond.\n'
                                                   'So, don\'t spam this button\n'
                                                   'Add items one by one',
                                  widget_position='right_bottom',
                                  cancelable=True, )
+        widget.outer_circle_color = app.theme_cls.primary_dark[:3]
+        widget.outer_circle_alpha = 0.75
         widget.start()
         self.is_tap_target_shown = True
 
@@ -566,7 +576,7 @@ class AddNewLocationScreen(MDScreen):
 
 
 class MainApp(MDApp):
-    version = f'ver: {__version__}'
+    version = f'v{__version__}'
 
     @staticmethod
     def goto_screen(screen: str):
@@ -575,13 +585,13 @@ class MainApp(MDApp):
         change_screen_to(screen)
 
     @staticmethod
-    def validate_alarm_distance(root, text, mode, focus=True):
+    def validate_alarm_distance(root: MDScreen, text: str, mode: str, focus: bool = True, key: str = 'dist_inp'):
         if text == '' and not focus:
             if mode == 'm':
                 least = 50
             else:
                 least = 1
-            root.ids['dist_inp'].text = f'{least}'
+            root.ids[key].text = f'{least}'
             return
         try:
             if mode == 'm':
@@ -591,10 +601,10 @@ class MainApp(MDApp):
                 d = float(text)
                 least = 1
             if d < least:
-                root.ids['dist_inp'].text = f'{least}'
+                root.ids[key].text = f'{least}'
         except ValueError:
             if text != '':
-                root.ids['dist_inp'].text = text[:-1]
+                root.ids[key].text = text[:-1]
 
     @staticmethod
     def toast(message: str = '', fun=False, id_=''):
@@ -618,6 +628,10 @@ class MainApp(MDApp):
                 fun_index = len(fun_toast_messages) - 1
             message = message.capitalize()
         toast(message)
+
+    @staticmethod
+    def open_url(url: str) -> None:
+        webbrowser.open(url)
 
     def on_start(self):
         WindowBase.softinput_mode = 'below_target'
