@@ -1,0 +1,5 @@
+plyer==2.1.0
+kivymd==1.0.2
+Kivy==2.3.0
+pyjnius
+pillow==9.4.0

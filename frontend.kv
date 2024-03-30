@@ -54,7 +54,7 @@
         NavigationDrawerItem:
             icon: "send"
             text: "Send feedback"
-            on_release: app.toast(fun=True, id_='2')
+            on_release: app.send_feedback()
 
         MDNavigationDrawerDivider:
         MDNavigationDrawerLabel:
@@ -91,7 +91,7 @@
 
 <MyTopAppBar@MDTopAppBar>:
     md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '00'
-    # title: "Location laka-laka"
+    # title: "Location Alarm"
     # right_action_items: [["dots-vertical", lambda x: self.parent.parent.parent.parent.parent.parent.parent.ids['nav_bar'].set_state('open')]]
 
 
@@ -110,9 +110,9 @@
             MDTopAppBar:
                 id: top_app_bar
                 md_bg_color: app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '24'
-                elevation: 3
+                elevation: 0
                 pos_hint: {"top": 1}
-                title: 'Location laka-laka'
+                title: 'Location Alarm'
                 right_action_items: [["dots-vertical", lambda x: nav_bar.set_state("open")]]
 
     MyNavigationDrawerItem:
@@ -312,6 +312,23 @@
             # always_overscroll: False
             effect_cls: ScrollEffect
             scroll_type: ['bars', 'content']
+            canvas.before:
+                Color:
+                    rgba: app.color_converter(app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '40')
+                Rectangle:
+                    size: self.size[0], self.size[1]/2
+                    pos: self.x, self.top / 2
+                Color:
+                    rgba: app.color_converter(app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '25')
+                Rectangle:
+                    size: self.size[0], self.size[1]/2
+                    pos: self.pos
+                Color:
+                    rgba: app.theme_cls.bg_normal  # whatever you do keep alpha as 1
+                RoundedRectangle:
+                    size: self.size
+                    radius: dp(16),
+                    pos: self.pos
             BoxLayout:
                 padding: dp(15), dp(10), dp(15), dp(18)
                 spacing: dp(20)
@@ -325,7 +342,7 @@
 
 <GoogleMapsTab>:
     MDRaisedButton:
-        text: 'Goto:\n \nGoogle Maps'
+        text: 'open "Google Maps"'
         pos_hint: {'center_x': 0.5, 'center_y': 0.5}
         on_release:
             app.open_url('https://maps.google.com/')
@@ -510,4 +527,67 @@
                     pos_hint: {'center_x': 0.5}
                     on_release: app.toast(fun=True, id_='8')
 
+
+
+<MyLabel@MDLabel>:
+    size_hint_y: None
+    height: self.texture_size[1]
+    halign: 'center'
+
+<FirstInfoScreen>:
+    MDScreen:
+        ScrollView:
+            BoxLayout:
+                size_hint_y: None
+                height: self.minimum_height
+                orientation: 'vertical'
+                padding: 25
+                MyLabel:
+                    text: 'DISCLAIMER'
+                    font_style: 'H4'
+                MyLabel:
+                    text: '\nLast updated March 2, 2024\n'
+                # MyLabel:
+                #     text: "Read this carefully"
+                MyLabel:
+                    text: '•Before starting:'
+                    font_style: 'H5'
+                    halign: 'left'
+                MyLabel:
+                    pos_hint: {'center_x': 0.55}
+                    size_hint_x: 0.92
+                    halign: 'left'
+                    text: "\n      This app is still under development, you may experience frequent crashes, glitches or bugs. Don't worry!, with your feedback these can be fixed, So please consider giving feedback.\n\n"
+                    # text: '\n      The information provided by YoutubeVideoDownloader ("we," "us," or "our") on our mobile application is for general informational purposes. All information on our mobile application is provided in good faith, however we make no representation or warranty of any kind, express or implied, regarding the accuracy, adequacy, validity, reliability, availability, or completeness of any information on our mobile application. UNDER NO CIRCUMSTANCE SHALL WE HAVE ANY LIABILITY TO YOU FOR ANY LOSS OR DAMAGE OF ANY KIND INCURRED AS A RESULT OF THE USE OF OUR MOBILE APPLICATION OR RELIANCE ON ANY INFORMATION PROVIDED ON OUR MOBILE APPLICATION. YOUR USE OF OUR MOBILE APPLICATION AND YOUR RELIANCE ON ANY INFORMATION ON OUR MOBILE APPLICATION IS SOLELY AT YOUR OWN RISK.\n\n'
+                MyLabel:
+                    text: '•Your Data:'
+                    font_style: 'H5'
+                    halign: 'left'
+                MyLabel:
+                    pos_hint: {'center_x': 0.55}
+                    size_hint_x: 0.92
+                    halign: 'left'
+                    text: "\n      We respect your privacy, our app DO NOT collect, store* or process any kind of information except the feedback provided by you. Your feedback is kept only between us and you (end user), we do not share your information with any third parties. IN-CASE OF LOSS OR DAMAGE OF YOU INFO UNDER ANY CIRCUMSTANCE IS ASSUMED SOLELY BY YOURS\n\n\n      *Storing doesn't include \"Error log\", this file is created when the app is about to crash. This file contains useful information about error.\n\nWhich includes\n  1.  Time error happened\n  2. Your device architecture and\n  3. Actual error info\n\n     We use these information to re-create bug and try to eliminate it\n\n"
+                    # text: '\n      Our mobile application may contain (or you may be sent through our mobile application) links to other websites or content belonging to or originating from third parties (i.e; Youtube). Such external links are not investigated, monitored, or checked for accuracy, adequacy, validity, reliability, availability, or completeness by us. WE DO NOT WARRANT, ENDORSE, GUARANTEE, OR ASSUME RESPONSIBILITY FOR THE ACCURACY OR RELIABILITY OF ANY INFORMATION OFFERED BY THIRD-PARTY WEBSITES (here Youtube only) LINKED THROUGH THE SITE. WE WILL NOT BE A PARTY TO OR IN ANY WAY BE RESPONSIBLE FOR MONITORING ANY TRANSACTION BETWEEN YOU AND YOUTUBE PROVIDERS OF PRODUCTS OR SERVICES.\n\n'
+                MyLabel:
+                    text: '•Message from developer:'
+                    font_style: 'H5'
+                    halign: 'left'
+                MyLabel:
+                    pos_hint: {'center_x': 0.55}
+                    size_hint_x: 0.92
+                    halign: 'left'
+                    text: "\n      Thank you for installing this app. Remember you are \'alpha\' tester for this app, currently NOTHING works at all, you have to look at UI/UX (User Interface -> how ease it is to us this app and how it visually appealing look wise) and give feedback is there any changes needed or any new additions/features required,  Your opinion matters, I love to hear your feedback. See you in the feedback section, Happy hunting bugs ;)\n\n"
+                    # text: '\n      Downloading the copyrighted video/audio is illegal we were not responsible for your downloads!. Download at your risk\n'
+                # MyLabel:
+                #     halign: 'left'
+                #     font_style: 'Caption'
+                #     text: '*By pressing Continue you agreeing to the above conditions\n'
+
+
+                MDRaisedButton:
+                    text: 'Continue'
+                    on_release: root.agree()
+                    pos_hint: {'center_x': 0.5}
+                    size_hint: 0.6, None
 

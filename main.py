@@ -1,22 +1,30 @@
 __version__: str = '1.2.6'
+__test_version__: str = 'alpha'
 
+import os
 import re
 import time
 import webbrowser
+import plyer
+
+import exceptions_handler
 
 from kivymd.app import MDApp
 from kivymd.toast import toast as _toast
 from kivymd.uix.screen import MDScreen
+from kivymd.uix.dialog import MDDialog
 from kivymd.uix.list import OneLineListItem
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.menu.menu import MDDropdownMenu
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.taptargetview import MDTapTargetView
+from kivymd.uix.button import MDFlatButton, MDRaisedButton
 from kivymd.uix.transition.transition import MDFadeSlideTransition
 from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansionPanelThreeLine, \
     MDExpansionPanelTwoLine, MDExpansionPanelLabel
 
 from kivy.clock import Clock
+from kivy.utils import platform
 from kivy.metrics import dp, sp
 from kivy.animation import Animation
 from kivy.lang.builder import Builder
@@ -24,9 +32,9 @@ from kivy.core.window import WindowBase, EventLoop
 
 current_screen = previous_screen = 'home'
 
-unsigned_float_pattern = r'\d+\.?\d*'
+unsigned_float_pattern = r'\d+\.?\d*'  # r'\d+(\.?\d+)?' <- preferable (Not tested)
 decimal_regex_pattern = r'[+-]?\d+\.?\d*'  # r'[+-]?\d+\.\d+|[+-]?\d+'
-dms_regex_pattern_NEWS_format = r'\d+\D\d+\D\d+\.?\d*[NEWS]'
+dms_regex_pattern_NSEW_format = r'\d+\D\d+\D\d+\.?\d*[NSEW]'
 dms_regex_pattern_sign_format = r'[+-]?\d+\D\d+\D\d+\.?\d*'
 
 fun_toast_messages = [
@@ -44,13 +52,17 @@ fun_ids = {}
 fun_again_press = [
     ' ',
     ':) ',
-    'I told you ',
-    'Why are you trying to open it again and again, I told you ',
+    'I told you, ',
+    'Why are you trying to open it again and again, I\'m telling you, ',
     'IMPORTANT: ',
     'Read this carefully: ',
     'This is last time: ',
     ':(',
     '']
+
+error_handler = exceptions_handler.ErrorHandler('./Error log/')
+
+__version__ += " " * (bool(__test_version__)) + __test_version__  # Adds <space> if __test_version__ present
 
 
 # Kivy doesn't allow changing screen from outer thread other than kivy's
@@ -71,7 +83,7 @@ last_esc_down = 0
 
 
 # Response every keystroke including esc button
-def hook_keyboard(_, key, *__):
+def hook_keyboard(_, key, *__) -> None | bool:
     global last_esc_down
     if key == 27:  # Esc button on Windows and back button on Android
         if sm.current in ('settings', 'saved_locations'):
@@ -104,13 +116,13 @@ def regex_match_gps(text: str) -> list:
     Returns GPS co-ordinates in a given string
     :param text: input string
     :return: list of matching items,
-    three items -> NEWS (direction in the form of North, south, East or West)
-    two items -> hour-minute-sec format (direction in signed)
+    three items -> NSEW (direction in the form of North, south, East or West)
+    two items -> hour-minute-sec format (direction in signed form)
     one item -> decimal format
-    empty list -> no match (not a valid sco-ords)
+    empty list -> no match (not a valid co-ords)
     """
     text = text.upper()
-    out = [re.findall(pattern, text) for pattern in [dms_regex_pattern_NEWS_format,
+    out = [re.findall(pattern, text) for pattern in [dms_regex_pattern_NSEW_format,
                                                      dms_regex_pattern_sign_format,
                                                      decimal_regex_pattern]]
     print(out)
@@ -142,7 +154,7 @@ def convert_gps_to_decimal_degree(deg: int, minute: int, sec: float, direction: 
     :return: decimal co-ordinate
     """
     out_deci = deg + minute / 60 + sec / 3600
-    if direction in ('W', 'S', '-', -1):
+    if direction in ('W', 'S', '-', -1, '-1'):
         out_deci *= -1
     return out_deci
 
@@ -175,7 +187,7 @@ def validate_gps_co_ords(text: str) -> bool:
         if match:
             break
     else:
-        return False
+        return False  # No match (for loop ended normally without breaking)
     if len(match) != 2:  # there are more or less items (2 -> 1 latitude and 1 longitude)
         if ind == 1 and len(match) == 1 and len(regex_cords[-1]) == 2:  # This case will solve problem like
             # '12.34 56.78' this is GPS co-ord in decimal from, but it also matches with DMS of sign format
@@ -203,6 +215,44 @@ def validate_gps_co_ords(text: str) -> bool:
         lat, lng = match
 
     return validate_gps_cord(lat, lng)
+
+
+def dialog_type_1(title: str, msg: str, buttons: list, auto_dismiss_on_button_press: bool = True):
+    dialog = MDDialog(
+        title=title,
+        text=msg,
+        buttons=buttons)
+    # dialog.auto_dismiss = False
+    if auto_dismiss_on_button_press:
+        for button in buttons:
+            button.bind(on_release=dialog.dismiss)
+    dialog.open()
+
+
+__log_to_send: str = ''
+
+
+def send_log(_=None):
+    if platform == 'android':
+        send_email(recipient='ranjipythondev2048@gmail.com',
+                   msg=__log_to_send,
+                   create_chooser='text')
+        toast('Choose \'Gmail\' or \'WhatsApp\'')
+    else:
+        toast('This feature only available on android')
+
+
+def send_email(msg: str, recipient: str, create_chooser: str = 'text'):
+    plyer.email.send(recipient=recipient,
+                     text=msg,
+                     create_chooser=create_chooser)
+
+
+def delete_log(_=None):
+    try:
+        error_handler.delete_error_log(error_handler.list_log_files()[0])
+    except IndexError:  # FileNotFoundError is already handled
+        pass
 
 
 class WeeksToggleButtons(MDBoxLayout):
@@ -292,8 +342,8 @@ class AlarmExpansionContent(MDBoxLayout):
     def remove(self):
         self.parent.remove()
 
-    def set_drop_down_item(self, opt):
-        self.ids['m_km_button'].text = opt
+    def set_drop_down_item(self, option):
+        self.ids['m_km_button'].text = option
         self.drop_down_menu.dismiss()
 
 
@@ -440,7 +490,7 @@ class HomeScreen(MDScreen):
         super().__init__(*args, **kwargs)
         self.is_test_scroll = True
         self._color = None
-        self.is_tap_target_shown = False
+        self.is_tap_target_shown = True  # TODO: disabled for debugging make it False for production
 
     def on_enter(self, *args):
         # pass
@@ -626,17 +676,82 @@ class MainApp(MDApp):
                 fun_index += 1
             if fun_index >= len(fun_toast_messages):
                 fun_index = len(fun_toast_messages) - 1
-            message = message.capitalize()
+            # message = message.capitalize()
         toast(message)
 
     @staticmethod
     def open_url(url: str) -> None:
         webbrowser.open(url)
 
+    @staticmethod
+    def color_converter(inp: str, mode: str = 'code'):
+        if mode == "code":
+            # TODO: format consideration
+            pass
+        r = int(inp[:2], 16) / 255
+        g = int(inp[2:4], 16) / 255
+        b = int(inp[4:6], 16) / 255
+        try:
+            a = int(inp[6:8], 16) / 255
+        except IndexError:
+            a = 1
+        except ValueError:
+            a = 1
+        return r, g, b, a
+
+    @staticmethod
+    def send_feedback():
+        global __log_to_send
+
+        def send_without_log(_=None):
+            send_email(recipient='ranjipythondev2048@gmail.com', msg='')
+
+        #
+        if __log_to_send:  # and error_handler.list_log_files():
+            include = MDRaisedButton(text='Yes, include')
+            no = MDFlatButton(text='No, thanks')
+            include.bind(on_release=send_log)
+            no.bind(on_release=send_without_log)
+            dialog_type_1('Error log found', "Error log was found do you want to include this file?",
+                          auto_dismiss_on_button_press=True, buttons=[no, include])
+        else:
+            send_without_log()
+
     def on_start(self):
+        global __log_to_send
         WindowBase.softinput_mode = 'below_target'
-        WindowBase.on_maximize = lambda x=None: print(x, 'Hello')
-        WindowBase.on_restore = lambda x=None: print(x, 'hell')
+        WindowBase.on_maximize = lambda x=None: print(x, 'maximised')
+        WindowBase.on_restore = lambda x=None: print(x, 'window restore')
+        try:
+            files = error_handler.list_log_files(raise_folder_not_found=True)
+            if files:
+                __log_to_send = error_handler.read_error_log(files[0])
+                cancel = MDFlatButton(text='CANCEL')
+                send = MDRaisedButton(text='SEND')
+                dialog_type_1(title="Error detected!",
+                              msg='Error detected or App closed unexpectedly, please send this error log to developer'
+                                  ' (This file will be automatically deleted after sending it!)',
+                              buttons=[cancel, send],
+                              auto_dismiss_on_button_press=True)
+                send.bind(on_press=send_log)
+                send.bind(on_press=delete_log)
+                # cancel.bind(on_press=delete_log)
+            else:
+                # without this line code will raise "NameError: name '_MainApp__log_to_send' is not defined"
+                __log_to_send = ''  # I don't think this is needed but without this send_feedback function will break
+                # And the app will crash :(, IDK why
+        except FileNotFoundError:
+            class FirstInfoScreen(MDScreen):
+                @staticmethod
+                def agree():
+                    change_screen_to('home')
+                    os.mkdir('Error log')
+                    toast("Made by Ranjith")
+
+            first_info = FirstInfoScreen(name='first_info')
+            sm.add_widget(first_info)
+            change_screen_to('first_info')
+
         # app.theme_cls.bg
         EventLoop.window.bind(on_keyboard=hook_keyboard)
 
@@ -644,6 +759,10 @@ class MainApp(MDApp):
         self.theme_cls.material_style = 'M3'
         self.theme_cls.theme_style = 'Dark'
         self.theme_cls.primary_palette = 'Teal'
+        # ['Red', 'Pink', 'Purple', 'DeepPurple', 'Indigo', 'Blue', 'DeepOrange', 'Teal', 'Brown', 'BlueGray']
+        #
+        # Don't use below colors (These colors changes text color to black, wiz not suitable for dark mode)
+        # 'Green', 'LightGreen', 'Lime', 'Yellow', 'Amber', 'Orange',  'LightBlue',  'Cyan',  'Gray'
         return sm
 
 
@@ -664,4 +783,5 @@ if __name__ == '__main__':
 
     # sm.current = 'new_location'
 
-    app.run()
+    # TODO: Make raise_error to False for production
+    error_handler.call__catch_and_crash(app.run, raise_error=True)  # platform != 'android')
