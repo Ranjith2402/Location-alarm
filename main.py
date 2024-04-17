@@ -1,4 +1,4 @@
-__version__: str = '1.2.6'
+__version__: str = '1.2.8.1'
 __test_version__: str = 'alpha'
 
 import os
