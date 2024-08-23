@@ -591,3 +591,15 @@
                     pos_hint: {'center_x': 0.5}
                     size_hint: 0.6, None
 
+
+<LoadingScreen>:
+    FloatLayout:
+        MDSpinner:
+            size_hint: None, None
+            size: dp(80), dp(80)
+            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+        MyLabel:
+            id: label
+            halign: 'center'
+            pos_hint: {'top': 0.5 - (dp(50) / root.height), 'center_x': 0.5}
+

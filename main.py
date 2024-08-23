@@ -1,15 +1,17 @@
-__version__: str = '1.2.8.1'
+__version__: str = '1.3.0'
 __test_version__: str = 'alpha'
 
+import math
 import os
+import random
 import re
 import time
-import webbrowser
 import plyer
+import webbrowser
 
+import data_handler
 import exceptions_handler
 
-from kivymd.uix.selectioncontrol import MDSwitch
 from kivymd.app import MDApp
 from kivymd.toast import toast as _toast
 from kivymd.uix.screen import MDScreen
@@ -17,6 +19,7 @@ from kivymd.uix.dialog import MDDialog
 from kivymd.uix.list import OneLineListItem
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.menu.menu import MDDropdownMenu
+from kivymd.uix.selectioncontrol import MDSwitch
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.taptargetview import MDTapTargetView
 from kivymd.uix.button import MDFlatButton, MDRaisedButton
@@ -33,9 +36,9 @@ from kivy.core.window import WindowBase, EventLoop
 
 current_screen = previous_screen = 'home'
 
-unsigned_float_pattern = r'\d+\.?\d*'  # r'\d+(\.?\d+)?' <- preferable (Not tested)
-decimal_regex_pattern = r'[+-]?\d+\.?\d*'  # r'[+-]?\d+\.\d+|[+-]?\d+'
-dms_regex_pattern_NSEW_format = r'\d+\D\d+\D\d+\.?\d*[NSEW]'
+unsigned_float_pattern = r'\d+(?:\.\d+)?'
+decimal_regex_pattern = rf'[+-]?{unsigned_float_pattern}'  # r'[+-]?\d+\.\d+|[+-]?\d+'
+dms_regex_pattern_NSEW_format = r'\d+\D\d+\D\d+\.?\d*[NSEW]'  # \d+\D\d+\D\d+(?:\.\d+)?[NSEW]  <-- preferable
 dms_regex_pattern_sign_format = r'[+-]?\d+\D\d+\D\d+\.?\d*'
 
 fun_toast_messages = [
@@ -44,9 +47,11 @@ fun_toast_messages = [
     'Even this feature is also in development',
     'This feature also is not working',
     'No, this won\'t work for now',
+    'Nothing happens',
     'Thanks for testing but not works for now',
     'I\'m sleeping, see you later',
     'Available in next update',
+    'There is nothing in here',
     'This feature is still in development']
 fun_index = 0
 fun_ids = {}
@@ -58,10 +63,12 @@ fun_again_press = [
     'IMPORTANT: ',
     'Read this carefully: ',
     'This is last time: ',
-    ':(',
+    ':( ',
+    'Bruh, ',
     '']
 
 error_handler = exceptions_handler.ErrorHandler('./Error log/')
+secret_data = data_handler.SecreteData()
 
 __version__ += " " * (bool(__test_version__)) + __test_version__  # Adds <space> and version if __test_version__ present
 
@@ -136,7 +143,19 @@ def split_gps_deci_str(string: str) -> tuple:
     :param string: DMS input
     :return: split text
     """
-    out = re.findall(unsigned_float_pattern, string)
+    out = re.findall(r'\d+', string)
+    if len(out) == 4:  # and re.match(unsigned_float_pattern, string):
+        # Decimal point to last number, if we use a float pattern, it won't match the rest
+        try:
+            out[2] += '.' + out.pop(3)
+
+            # I am D\_/mb, so wrote this code
+            # This divides the last number by its length and add it to the last number
+            # tmp = int(out.pop(3))
+            # out[2] += str(tmp / (10 * (1 + int(math.log(tmp, 10)))))[1::]  # It works :)
+            # print(out)
+        except ValueError:
+            pass
     if string.startswith('-') or string.endswith('S') or string.endswith('W'):
         direction = -1
     else:
@@ -180,9 +199,10 @@ def validate_gps_cord(lat: str, lng: str) -> bool:
 def validate_gps_co_ords(text: str) -> bool:
     """
     Validates GPS co-ordinates of any format
-    :param text: Co-ordinates
+    :param text: Co-ordinates make sure to send capitalized text
     :return: boolean; True if it is valid, else False
     """
+    text = text.capitalize()
     regex_cords = regex_match_gps(text)
     for ind, match in enumerate(regex_cords):
         if match:
@@ -218,24 +238,35 @@ def validate_gps_co_ords(text: str) -> bool:
     return validate_gps_cord(lat, lng)
 
 
-def dialog_type_1(title: str, msg: str, buttons: list, auto_dismiss_on_button_press: bool = True):
+def dialog_type_1(title: str, msg: str, buttons: list, auto_dismiss_on_button_press: bool = True,
+                  dismissible: bool = True) -> MDDialog:
+    """
+    Creates a dialog box, to interact with user
+    :param title: Dialog title
+    :param msg: Message to deliver
+    :param buttons: buttons to interact with
+    :param auto_dismiss_on_button_press: If set True dismisses dialog box after button press
+    :param dismissible: If set True dismisses dialog even after no button press
+    :return: Nothing
+    """
     dialog = MDDialog(
         title=title,
         text=msg,
         buttons=buttons)
-    # dialog.auto_dismiss = False
+    dialog.auto_dismiss = dismissible if buttons else True  # Make sure to give buttons or else no way to dismiss
     if auto_dismiss_on_button_press:
         for button in buttons:
             button.bind(on_release=dialog.dismiss)
     dialog.open()
+    return dialog  # if you want to dismiss manually
 
 
 __log_to_send: str = ''
 
 
 def send_log(_=None):
-    if platform == 'android':
-        send_email(recipient='ranjipythondev2048@gmail.com',
+    if platform in ('android',):  # debug with 'win'
+        send_email(recipient=secret_data['mail'],
                    msg=__log_to_send,
                    create_chooser='text')
         toast('Choose \'Gmail\' or \'WhatsApp\'')
@@ -305,7 +336,7 @@ class MySwitch(MDSwitch):
 
     def on_thumb_down(self) -> None:
         """
-        Called at the on_touch_down event of the :class:`~Thumb` object.
+        Called at the on_touch_down event of the class: 'Thumb' object.
         Indicates the state of the switch "on/off" by an animation of
         increasing the size of the thumb.
         """
@@ -313,7 +344,8 @@ class MySwitch(MDSwitch):
         if self.widget_style != "ios" and self.theme_cls.material_style == "M3":
             if self.active:
                 size = (dp(28), dp(28))
-                pos = (self.ids.thumb.pos[0] - dp(2), self.ids.thumb.pos[1] - dp(1.8),) if not self.is_thumb_size_changed \
+                pos = (self.ids.thumb.pos[0] - dp(2), self.ids.thumb.pos[1] - dp(1.8),) \
+                    if not self.is_thumb_size_changed \
                     else self.ids.thumb.pos
             else:
                 size = (dp(26), dp(26))
@@ -514,6 +546,16 @@ class AlarmExpansionPanel(MDExpansionPanel):
         self.parent.remove_widget(self)  # goodbye
 
 
+class LoadingScreen(MDScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.loading_text = ['Please wait...',
+                             'Loading...']
+
+    def on_enter(self, *args):
+        self.ids['label'].text = random.choice(self.loading_text)
+
+
 class AlarmsTab(MDScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -692,12 +734,9 @@ class AddNewLocationScreen(MDScreen):
             #     raise KeyError
             # lat, lng = out[0], out[1]
             self.ids['cords_in'].error = not validate_gps_co_ords(txt)
-        except KeyError:
-            print('Key error')
-        except TypeError:
-            print('Type error')
-        except ValueError:
-            print('Value error')
+        except (KeyError, TypeError, ValueError) as e:
+            print('Error while validating gps cords')
+            print(e)
         else:
             # if no error
             return
@@ -783,7 +822,7 @@ class MainApp(MDApp):
         global __log_to_send
 
         def send_without_log(_=None):
-            send_email(recipient='ranjipythondev2048@gmail.com', msg='')
+            send_email(recipient=secret_data['mail'], msg='')
 
         #
         if __log_to_send:  # and error_handler.list_log_files():
@@ -851,16 +890,18 @@ if __name__ == '__main__':
     sm = MDScreenManager(transition=MDFadeSlideTransition())
 
     home = HomeScreen(name='home')
+    loading = LoadingScreen(name='loading')
     settings = SettingsScreen(name='settings')
     saved_locations = SavedLocationsScreen(name='saved_locations')
     new_location = AddNewLocationScreen(name='new_location')
 
     sm.add_widget(home)
+    sm.add_widget(loading)
     sm.add_widget(settings)
     sm.add_widget(saved_locations)
     sm.add_widget(new_location)
 
-    # sm.current = 'new_location'
+    sm.current = 'new_location'
 
     # TODO: Make raise_error to False for production
     error_handler.call__catch_and_crash(app.run, raise_error=True)  # platform != 'android')
