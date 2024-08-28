@@ -9,6 +9,12 @@ class SaveFailedException(CommonClass, PermissionError):
         super(CommonClass, self).__init__(*args)
 
 
+class GPSNotImplementedError(CommonClass, NotImplementedError):
+    def __init__(self, *args, short_error=''):
+        super().__init__(short_error=short_error)
+        super(CommonClass, self).__init__(*args)
+
+
 if __name__ == '__main__':
     try:
         raise SaveFailedException(short_error='Some error')

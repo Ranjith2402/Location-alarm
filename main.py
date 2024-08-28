@@ -1,16 +1,17 @@
-__version__: str = '1.3.0'
+__version__: str = '1.4.0'
 __test_version__: str = 'alpha'
 
-import math
 import os
 import random
 import re
+import sys
 import time
 import plyer
 import webbrowser
 
 import data_handler
 import exceptions_handler
+import gps
 
 from kivymd.app import MDApp
 from kivymd.toast import toast as _toast
@@ -22,14 +23,15 @@ from kivymd.uix.menu.menu import MDDropdownMenu
 from kivymd.uix.selectioncontrol import MDSwitch
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.taptargetview import MDTapTargetView
-from kivymd.uix.button import MDFlatButton, MDRaisedButton
 from kivymd.uix.transition.transition import MDFadeSlideTransition
+from kivymd.uix.button import MDFlatButton, MDRaisedButton, MDFillRoundFlatButton
 from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansionPanelThreeLine, \
     MDExpansionPanelTwoLine, MDExpansionPanelLabel
 
 from kivy.clock import Clock
 from kivy.utils import platform
 from kivy.metrics import dp, sp
+from kivy.uix.button import Button
 from kivy.animation import Animation
 from kivy.lang.builder import Builder
 from kivy.core.window import WindowBase, EventLoop
@@ -73,13 +75,16 @@ secret_data = data_handler.SecreteData()
 __version__ += " " * (bool(__test_version__)) + __test_version__  # Adds <space> and version if __test_version__ present
 
 
-# Kivy doesn't allow changing screen from outer thread other than kivy's
+GPS = gps.GPS()
+
+
+# Kivy doesn't allow changing screen from outer thread other than kivy's (tested on windows)
 # This function uses kivy's Clock to change screen
 def change_screen_to(screen: str) -> None:
     global current_screen, previous_screen
     previous_screen = current_screen
     current_screen = screen
-    Clock.schedule_once(_set_screen, 0.1)
+    Clock.schedule_once(_set_screen, 0.0)
 
 
 # Actual screen changing happens here
@@ -238,7 +243,7 @@ def validate_gps_co_ords(text: str) -> bool:
     return validate_gps_cord(lat, lng)
 
 
-def dialog_type_1(title: str, msg: str, buttons: list, auto_dismiss_on_button_press: bool = True,
+def dialog_type_1(title: str, msg: str, buttons: list[Button], auto_dismiss_on_button_press: bool = True,
                   dismissible: bool = True) -> MDDialog:
     """
     Creates a dialog box, to interact with user
@@ -247,7 +252,7 @@ def dialog_type_1(title: str, msg: str, buttons: list, auto_dismiss_on_button_pr
     :param buttons: buttons to interact with
     :param auto_dismiss_on_button_press: If set True dismisses dialog box after button press
     :param dismissible: If set True dismisses dialog even after no button press
-    :return: Nothing
+    :return: Dialog
     """
     dialog = MDDialog(
         title=title,
@@ -869,6 +874,14 @@ class MainApp(MDApp):
             first_info = FirstInfoScreen(name='first_info')
             sm.add_widget(first_info)
             change_screen_to('first_info')
+        if GPS.configure(raise_error=False):
+            button = MDFillRoundFlatButton(text='Close app')
+            button.bind(on_release=sys.exit)
+            dialog_type_1('Oh no!',
+                          'It seems like GPS is not implemented on your device!!!',
+                          [button],
+                          dismissible=False,
+                          auto_dismiss_on_button_press=False)
 
         # app.theme_cls.bg
         EventLoop.window.bind(on_keyboard=hook_keyboard)
@@ -901,7 +914,7 @@ if __name__ == '__main__':
     sm.add_widget(saved_locations)
     sm.add_widget(new_location)
 
-    sm.current = 'new_location'
+    # sm.current = 'new_location'
 
     # TODO: Make raise_error to False for production
     error_handler.call__catch_and_crash(app.run, raise_error=True)  # platform != 'android')

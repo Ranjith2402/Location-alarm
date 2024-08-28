@@ -1,14 +1,7 @@
 import json
 
-from kivy.utils import platform
-
 from custom_errors import SaveFailedException
-
-if platform == 'android':
-    from jnius import autoclass
-else:
-    def autoclass(*_):
-        return lambda *x: x
+from jnius_helper import autoclass
 
 String = autoclass('java.lang.String')
 KeyStore = autoclass('java.security.KeyStore')
@@ -75,6 +68,12 @@ class UIDataHandler:
             raise SaveFailedException('Failed to save UI data, something went wrong',
                                       short_error='Something went wrong')
 
+    def __getitem__(self, item):
+        return self.data.get(item, None)
+
+    def __setitem__(self, key, value):
+        self.data[key] = value
+
 
 class EssentialDataHandler:
     pass
@@ -109,6 +108,7 @@ if __name__ == '__main__':
     try:
         data.dump()
         data.load_data()
+        a = data['theme']
     except SaveFailedException:
         import traceback
         print(traceback.format_exc())
