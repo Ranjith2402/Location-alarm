@@ -1,13 +1,14 @@
-__version__: str = '1.4.0'
+__version__: str = '1.5.0'
 __test_version__: str = 'alpha'
 
 import os
-import random
 import re
 import sys
 import time
 import plyer
+import random
 import webbrowser
+from typing import Callable
 
 import data_handler
 import exceptions_handler
@@ -34,6 +35,7 @@ from kivy.metrics import dp, sp
 from kivy.uix.button import Button
 from kivy.animation import Animation
 from kivy.lang.builder import Builder
+from kivy.uix.screenmanager import Screen
 from kivy.core.window import WindowBase, EventLoop
 
 current_screen = previous_screen = 'home'
@@ -89,7 +91,8 @@ def change_screen_to(screen: str) -> None:
 
 # Actual screen changing happens here
 def _set_screen(_):
-    sm.current = current_screen
+    # sm.current = current_screen
+    screens.change_screen(current_screen)
 
 
 last_esc_down = 0
@@ -207,7 +210,7 @@ def validate_gps_co_ords(text: str) -> bool:
     :param text: Co-ordinates make sure to send capitalized text
     :return: boolean; True if it is valid, else False
     """
-    text = text.capitalize()
+    text = text.upper()
     regex_cords = regex_match_gps(text)
     for ind, match in enumerate(regex_cords):
         if match:
@@ -244,14 +247,17 @@ def validate_gps_co_ords(text: str) -> bool:
 
 
 def dialog_type_1(title: str, msg: str, buttons: list[Button], auto_dismiss_on_button_press: bool = True,
-                  dismissible: bool = True) -> MDDialog:
+                  dismissible: bool = True, on_dismiss_callback: Callable = None,
+                  extra_callbacks: dict[str, Callable] = None) -> MDDialog:
     """
-    Creates a dialog box, to interact with user
+    Creates a dialog box, to interact with user.
     :param title: Dialog title
     :param msg: Message to deliver
     :param buttons: buttons to interact with
     :param auto_dismiss_on_button_press: If set True dismisses dialog box after button press
     :param dismissible: If set True dismisses dialog even after no button press
+    :param on_dismiss_callback: Callback after closing dialog,
+    :param extra_callbacks: Custom new unknowns callbacks
     :return: Dialog
     """
     dialog = MDDialog(
@@ -263,6 +269,10 @@ def dialog_type_1(title: str, msg: str, buttons: list[Button], auto_dismiss_on_b
         for button in buttons:
             button.bind(on_release=dialog.dismiss)
     dialog.open()
+    if on_dismiss_callback is not None:
+        dialog.bind(on_dismiss=on_dismiss_callback)
+    if extra_callbacks is not None:
+        dialog.bind(**extra_callbacks)
     return dialog  # if you want to dismiss manually
 
 
@@ -565,7 +575,7 @@ class AlarmsTab(MDScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.scroll_start_callback = lambda x=None: x
-        self.expansion_items = []
+        self.expansion_items: list[AlarmExpansionPanel] = []
         self.checker_clock = Clock.schedule_interval(self.check_scroll, 5)
         # self.checker_clock.cancel()
 
@@ -576,7 +586,12 @@ class AlarmsTab(MDScreen):
         self.checker_clock.cancel()
 
     def check_scroll(self, *_):
-        print(self.ids['scroll_view'].scroll_y)
+        scroll_dist = self.ids['scroll_view'].scroll_y
+        # print(scroll_dist)
+        if scroll_dist > 1:
+            self.ids['scroll_view'].scroll_y = 1
+        elif scroll_dist < 0:
+            self.ids['scroll_view'].scroll_y = 0
 
     def add_active_alarms(self):
         item = AlarmExpansionPanel(
@@ -748,6 +763,77 @@ class AddNewLocationScreen(MDScreen):
         self.ids['cords_in'].error = True
 
 
+class MyScreenManager:
+    """
+    This class manages screens and creates screen when needed
+    Since, loading all screens while starting the app, create a blank screen for a while
+    which is not great.
+
+    NOTE: This class is only for this specific use case and not recommended for other cases (as of 12-09-2024)
+    """
+    def __init__(self, manager: MDScreenManager):
+        self.__rendered_screens: list[str] = []
+        self.screen_manager = manager
+        self.__screens: dict[str, Screen] = {}
+
+        self.__screens_to_render = {}
+
+    def change_screen(self, target_screen: str) -> None:
+        """
+        Changes sets current screen to target screen\n
+        Note: Must be called in from kivy thread
+        :param target_screen: Target screen, what else?
+        :return: None
+        """
+        if target_screen in self.__rendered_screens:
+            self.screen_manager.current = target_screen
+        else:
+            self.get_screen(target_screen)
+            self.screen_manager.current = target_screen
+
+    def get_screen(self, screen_name: str) -> Screen:
+        """
+        Returns the requested screen
+        :param screen_name: Required screen name
+        :return: Screen object
+        :raise TypeError: When screen is not added but called to render
+        """
+        if screen_name in self.__rendered_screens:
+            return self.__screens[screen_name]
+        else:
+            # Fixme: kwargs/args not supported
+            try:
+                screen = self.__screens_to_render[screen_name](name=screen_name)
+            except KeyError:
+                raise TypeError(f"Screen {screen_name} is not added")
+            self.screen_manager.add_widget(screen)
+            self.__screens[screen_name] = screen
+            self.__rendered_screens.append(screen_name)
+            return screen
+
+    def add_screen(self, screen_name: str, cls, _overwrite: bool = False) -> None:
+        """
+        Adds screen name and class to future rendering items
+        :param screen_name: Name of screen (this name is used to represent the object)
+        :param cls: Class
+        :param _overwrite: If set True, overwrites the previous Class
+        :return: None
+        :raise KeyError: When screen-name already exists
+        """
+        if screen_name in self.__screens_to_render:
+            if not _overwrite:
+                raise KeyError("This screen name already exists!")
+        self.__screens_to_render[screen_name] = cls
+
+    def _render_all(self):
+        """
+        Renders all provided screens and might cause a lag
+        :return: Nothing
+        """
+        for screen in self.__screens_to_render:
+            self.get_screen(screen)
+
+
 class MainApp(MDApp):
     version = f'v{__version__}'
 
@@ -840,6 +926,14 @@ class MainApp(MDApp):
         else:
             send_without_log()
 
+    @staticmethod
+    def on_location():
+        pass
+
+    @staticmethod
+    def on_status():
+        pass
+
     def on_start(self):
         global __log_to_send
         WindowBase.softinput_mode = 'below_target'
@@ -849,8 +943,8 @@ class MainApp(MDApp):
             files = error_handler.list_log_files(raise_folder_not_found=True)
             if files:
                 __log_to_send = error_handler.read_error_log(files[0])
-                cancel = MDFlatButton(text='CANCEL')
-                send = MDRaisedButton(text='SEND')
+                cancel = MDFlatButton(text='Cancel')
+                send = MDRaisedButton(text='Send')
                 dialog_type_1(title="Error detected!",
                               msg='Error detected or App closed unexpectedly, please send this error log to developer'
                                   ' (This file will be automatically deleted after sending it!)',
@@ -881,7 +975,12 @@ class MainApp(MDApp):
                           'It seems like GPS is not implemented on your device!!!',
                           [button],
                           dismissible=False,
-                          auto_dismiss_on_button_press=False)
+                          auto_dismiss_on_button_press=False,
+                          on_dismiss_callback=lambda *_: sys.exit())  # extra safety
+        GPS.set_callback(status_change_callback=self.on_status,
+                         location_change_callback=self.on_location)
+        if GPS.is_configured:
+            GPS.start()
 
         # app.theme_cls.bg
         EventLoop.window.bind(on_keyboard=hook_keyboard)
@@ -889,7 +988,12 @@ class MainApp(MDApp):
     def build(self):
         self.theme_cls.material_style = 'M3'
         self.theme_cls.theme_style = 'Dark'
-        self.theme_cls.primary_palette = 'Teal'
+        # palette = random.choice(['Red', 'Pink', 'Purple', 'DeepPurple', 'Indigo', 'Blue', 'DeepOrange', 'Teal',
+        #                          'Green', 'LightGreen', 'Lime', 'Yellow', 'Amber', 'Orange', 'LightBlue', 'Cyan'])
+        # self.theme_cls.primary_palette = palette
+        self.theme_cls.primary_palette = 'Blue'
+        # print(palette)
+        # self.theme_cls.primary_palette = 'Teal'
         # ['Red', 'Pink', 'Purple', 'DeepPurple', 'Indigo', 'Blue', 'DeepOrange', 'Teal', 'Brown', 'BlueGray']
         #
         # Don't use below colors (These colors changes text color to black, wiz not suitable for dark mode)
@@ -902,19 +1006,30 @@ if __name__ == '__main__':
     app = MainApp()
     sm = MDScreenManager(transition=MDFadeSlideTransition())
 
-    home = HomeScreen(name='home')
-    loading = LoadingScreen(name='loading')
-    settings = SettingsScreen(name='settings')
-    saved_locations = SavedLocationsScreen(name='saved_locations')
-    new_location = AddNewLocationScreen(name='new_location')
+    screens = MyScreenManager(sm)
 
-    sm.add_widget(home)
-    sm.add_widget(loading)
-    sm.add_widget(settings)
-    sm.add_widget(saved_locations)
-    sm.add_widget(new_location)
+    screens.add_screen('home', HomeScreen)
+    screens.add_screen('loading', LoadingScreen)
+    screens.add_screen('settings', SettingsScreen)
+    screens.add_screen('saved_locations', SavedLocationsScreen)
+    screens.add_screen('new_location', AddNewLocationScreen)
+
+    screens.get_screen('home')
+    # secret_data._render_all()
+
+    # home = HomeScreen(name='home')
+    # loading = LoadingScreen(name='loading')
+    # settings = SettingsScreen(name='settings')
+    # saved_locations = SavedLocationsScreen(name='saved_locations')
+    # new_location = AddNewLocationScreen(name='new_location')
+    #
+    # sm.add_widget(home)
+    # sm.add_widget(loading)
+    # sm.add_widget(settings)
+    # sm.add_widget(saved_locations)
+    # sm.add_widget(new_location)
 
     # sm.current = 'new_location'
 
-    # TODO: Make raise_error to False for production
+    # TODO: Make raise_error to False for production, disabled for debugging
     error_handler.call__catch_and_crash(app.run, raise_error=True)  # platform != 'android')

@@ -113,6 +113,7 @@
                 elevation: 0
                 pos_hint: {"top": 1}
                 title: 'Location Alarm'
+                specific_text_color: app.theme_cls.opposite_bg_dark
                 right_action_items: [["dots-vertical", lambda x: nav_bar.set_state("open")]]
 
     MyNavigationDrawerItem:
@@ -341,17 +342,79 @@
 
 
 <GoogleMapsTab>:
-    MDRaisedButton:
-        text: 'open "Google Maps"'
-        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
-        on_release:
-            app.open_url('https://maps.google.com/')
-            # app.toast(fun=True, id_='5')
-    MDRectangleFlatIconButton:
-        icon: 'hand-heart'
-        text: 'Support developer'
-        pos_hint: {'center_x': 0.5, 'center_y': 0.7}
-        on_release: app.toast('Thank you from bottom my heart but this is not working for now')
+    canvas.before:
+        Color:
+            rgba: app.color_converter(app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '40')
+        Rectangle:
+            size: self.size[0], self.size[1]/2 - dp(64)  # Todo_: This code is differs from active_alarms tab and does
+                                                            #    the same (it seems), but not tested tho
+            pos: self.x, self.top / 2
+        Color:
+            rgba: app.color_converter(app.theme_cls.colors[app.theme_cls.primary_palette]['900'] + '25')
+        Rectangle:
+            size: self.size[0], self.size[1]/2
+            pos: self.pos
+        Color:
+            rgba: app.theme_cls.bg_normal  # whatever you do keep alpha as 1
+        RoundedRectangle:
+            size: self.width, self.height - dp(64)
+            radius: dp(16),
+            pos: self.pos
+    MDBoxLayout:
+        orientation: 'vertical'
+        MDBoxLayout:
+            size_hint_y: None
+            height: dp(64)
+        MDBoxLayout:
+            MDScrollView:
+                effect_cls: ScrollEffect
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    MDBoxLayout:
+                        padding: '24dp'
+                        spacing: '15dp'
+                        orientation: 'vertical'
+                        size_hint: 1, None
+                        height: self.minimum_height
+                        MyLabel:
+                            id: co_ords
+                            text: 'Getting co-ordinates...'
+                            halign: 'left'
+                        MyLabel:
+                            id: location
+                            text: 'Getting location...'
+                            halign: 'left'
+                        MyLabel:
+                            id: speed
+                            text: 'Getting speed...'
+                            halign: 'left'
+                        MyLabel:
+                            id: heading
+                            text: 'Getting heading...'
+                            halign: 'left'
+            TooltipMDIconButton:
+                tooltip_text: 'Copy'
+                icon: 'content-copy'
+                pos_hint: {'right': 1, 'top': 1}
+        MDBoxLayout:
+            orientation: 'vertical'
+            size_hint_y: None
+            height: self.minimum_height
+            spacing: '24dp'
+            padding: 0, 0, 0, '25dp'
+            MDRaisedButton:
+                text: 'open "Google Maps"'
+                pos_hint: {'center_x': 0.5}  # 'center_y': 0.5}
+                on_release:
+                    app.open_url('https://maps.google.com/')
+                    # app.toast(fun=True, id_='5')
+            MDRectangleFlatIconButton:
+                icon: 'hand-heart'
+                text: 'Support developer'
+                pos_hint: {'center_x': 0.5}  # 'center_y': 0.7}
+                on_release: app.toast('Thank you from bottom my heart but this is not working for now')
 
 
 
@@ -485,6 +548,7 @@
                         on_focus: root.validate_gps_cords()
                         helper_text: 'Invalid GPS co-ordinates'
                         helper_text_mode: 'on_error'
+                        # max_text_length: 30
                     TooltipMDIconButton:
                         text: 'Paste'
                         tooltip_text: 'Paste from clipboard'

@@ -55,18 +55,25 @@ class ErrorHandler:
             pass
 
     def call__catch_and_crash(self, func: Callable, raise_error: bool = False):
+        def safe_log_writer(txt: str):
+            try:
+                self.write_log(txt)
+            except PermissionError:
+                pass
         try:
             func()
-        except SystemExit:
-            pass
         except KeyboardInterrupt:
             pass
+        except SystemExit as e:
+            print(e.code)
+            if e.code:
+                import traceback
+                safe_log_writer(traceback.format_exc())
+                if raise_error:
+                    raise
         except Exception as e:
             print(e.args)
             import traceback
-            try:
-                self.write_log(traceback.format_exc())
-            except PermissionError:
-                pass
+            safe_log_writer(traceback.format_exc())
             if raise_error:
                 raise
