@@ -61,7 +61,8 @@ class ErrorHandler:
             except PermissionError:
                 pass
         try:
-            func()
+            out = func()
+            return out
         except KeyboardInterrupt:
             pass
         except SystemExit as e:

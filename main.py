@@ -1,4 +1,4 @@
-__version__: str = '1.5.0'
+__version__: str = '1.5.1'
 __test_version__: str = 'alpha'
 
 import os
@@ -21,7 +21,6 @@ from kivymd.uix.dialog import MDDialog
 from kivymd.uix.list import OneLineListItem
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.menu.menu import MDDropdownMenu
-from kivymd.uix.selectioncontrol import MDSwitch
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.taptargetview import MDTapTargetView
 from kivymd.uix.transition.transition import MDFadeSlideTransition
@@ -45,21 +44,22 @@ decimal_regex_pattern = rf'[+-]?{unsigned_float_pattern}'  # r'[+-]?\d+\.\d+|[+-
 dms_regex_pattern_NSEW_format = r'\d+\D\d+\D\d+\.?\d*[NSEW]'  # \d+\D\d+\D\d+(?:\.\d+)?[NSEW]  <-- preferable
 dms_regex_pattern_sign_format = r'[+-]?\d+\D\d+\D\d+\.?\d*'
 
-fun_toast_messages = [
+fun_toast_messages: list[str] = [
     'This feature is in development',
     'This feature also in development',
     'Even this feature is also in development',
     'This feature also is not working',
     'No, this won\'t work for now',
+    'Under construction!!!',
     'Nothing happens',
     'Thanks for testing but not works for now',
     'I\'m sleeping, see you later',
     'Available in next update',
     'There is nothing in here',
     'This feature is still in development']
-fun_index = 0
-fun_ids = {}
-fun_again_press = [
+fun_index: int = 0
+fun_ids: dict[str, list] = {}
+fun_again_press: list[str] = [
     ' ',
     ':) ',
     'I told you, ',
@@ -75,7 +75,6 @@ error_handler = exceptions_handler.ErrorHandler('./Error log/')
 secret_data = data_handler.SecreteData()
 
 __version__ += " " * (bool(__test_version__)) + __test_version__  # Adds <space> and version if __test_version__ present
-
 
 GPS = gps.GPS()
 
@@ -111,7 +110,7 @@ def hook_keyboard(_, key, *__) -> None | bool:
                 return
             last_esc_down = time.time()
             toast('Press again to exit')
-        return True
+        return True  # To future me, Returning true is like telling System/App "this stroke is captured"
 
 
 last_toast_msg = ''
@@ -257,7 +256,7 @@ def dialog_type_1(title: str, msg: str, buttons: list[Button], auto_dismiss_on_b
     :param auto_dismiss_on_button_press: If set True dismisses dialog box after button press
     :param dismissible: If set True dismisses dialog even after no button press
     :param on_dismiss_callback: Callback after closing dialog,
-    :param extra_callbacks: Custom new unknowns callbacks
+    :param extra_callbacks: Custom new unknowns callbacks.In the format -> callback_name to callback
     :return: Dialog
     """
     dialog = MDDialog(
@@ -300,85 +299,6 @@ def delete_log(_=None):
         error_handler.delete_error_log(error_handler.list_log_files()[0])
     except IndexError:  # FileNotFoundError is already handled
         pass
-
-
-class MySwitch(MDSwitch):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.is_thumb_size_changed = False
-
-    def on_touch_down(self, touch):
-        # print(dir(touch))
-        # print(self.pos, touch.pos, [self.size[0] + self.pos[0], self.size[1] + self.pos[1]])
-
-        # Not my code start
-        # IDK if it is needed but added from its parent class
-        if self.disabled and self.collide_point(*touch.pos):
-            return True
-        for child in self.children[:]:
-            if child.dispatch('on_touch_down', touch):
-                return True
-        # Not my code end
-
-        if self.ids['thumb'].collide_point(touch.pos[0], touch.pos[1]):
-            self.on_thumb_down()
-            self._update_thumb_pos()
-        # print(self.pos[1] + self.size[1] - touch.pos[1])
-
-    def on_touch_up(self, touch):
-        # Below line is copied from kivymd.uix.selectioncontrol.selectioncontrol.kv (line 84-97 kivymd version 1.0.2)
-        # This draws a line around switch, I used this as a new bigger hit-box
-        hit_box = (self.x - dp(2), self.center_y - dp(14), self.width + dp(14), dp(28)) if self.widget_style == "ios" \
-            else ((1, 1, 1, 1) if app.theme_cls.material_style == "M2" else
-                  (self.x + dp(8), self.center_y - dp(8), self.width + dp(16), dp(32)))
-
-        # Draws the hit box
-        # with self.canvas.after:
-        #     Color(rgba=(1, 1, 1, 1))
-        #     Line(points=[(a[0], a[1]),
-        #                  (a[0] + a[2], a[1]),
-        #                  (a[0] + a[2], a[1] + a[3]),
-        #                  (a[0], a[1] + a[3]),
-        #                  (a[0], a[1])
-        #                  ])
-
-        if (hit_box[0] <= touch.pos[0] <= hit_box[0] + hit_box[2] and
-                hit_box[1] <= touch.pos[1] <= hit_box[1] + hit_box[3]):
-            setattr(self, "active", not self.active)
-            self.is_thumb_size_changed = False
-            # print('activated')
-
-    def on_thumb_down(self) -> None:
-        """
-        Called at the on_touch_down event of the class: 'Thumb' object.
-        Indicates the state of the switch "on/off" by an animation of
-        increasing the size of the thumb.
-        """
-
-        if self.widget_style != "ios" and self.theme_cls.material_style == "M3":
-            if self.active:
-                size = (dp(28), dp(28))
-                pos = (self.ids.thumb.pos[0] - dp(2), self.ids.thumb.pos[1] - dp(1.8),) \
-                    if not self.is_thumb_size_changed \
-                    else self.ids.thumb.pos
-            else:
-                size = (dp(26), dp(26))
-                pos = (
-                    (
-                        self.ids.thumb.pos[0] - dp(5),
-                        self.ids.thumb.pos[1] - dp(5),
-                    )
-                    if not self.icon_inactive
-                    else (
-                        self.ids.thumb.pos[0] + dp(1),
-                        self.ids.thumb.pos[1] - dp(1),
-                    )
-                ) if not self.is_thumb_size_changed else self.ids.thumb.pos
-            Animation(size=size, pos=pos, t="out_quad", d=0.2).start(
-                self.ids.thumb
-            )
-            self.is_thumb_size_changed = True
 
 
 class WeeksToggleButtons(MDBoxLayout):
@@ -497,6 +417,7 @@ class AlarmExpansionPanel(MDExpansionPanel):
     def on_close(self, *args):
         self.panel_cls.reset_corner_radii()
         self._reset_scroll()
+        self.height = self.panel_cls.height  # resets height manually
 
     def check_open_panel(
             self,
@@ -770,7 +691,12 @@ class MyScreenManager:
     which is not great.
 
     NOTE: This class is only for this specific use case and not recommended for other cases (as of 12-09-2024)
+    Result:
+        v1.2.8.1-------v1.5.0
+    time---8s------------5s------(Time to load home screen)
+    results seem to be promising with improvement of 3s
     """
+
     def __init__(self, manager: MDScreenManager):
         self.__rendered_screens: list[str] = []
         self.screen_manager = manager
@@ -816,7 +742,7 @@ class MyScreenManager:
         Adds screen name and class to future rendering items
         :param screen_name: Name of screen (this name is used to represent the object)
         :param cls: Class
-        :param _overwrite: If set True, overwrites the previous Class
+        :param _overwrite: If set True and screen_name exists, overwrites the previous Class of the same
         :return: None
         :raise KeyError: When screen-name already exists
         """
@@ -836,6 +762,10 @@ class MyScreenManager:
 
 class MainApp(MDApp):
     version = f'v{__version__}'
+
+    @property
+    def material_style(self) -> MDApp:
+        return self.theme_cls.material_style
 
     @staticmethod
     def goto_screen(screen: str):
@@ -866,7 +796,7 @@ class MainApp(MDApp):
                 root.ids[key].text = text[:-1]
 
     @staticmethod
-    def toast(message: str = '', fun=False, id_=''):
+    def toast(message: str = '', fun=False, id_: str = ''):
         global fun_index
         if fun:
             message = fun_toast_messages[fun_index]
@@ -965,18 +895,19 @@ class MainApp(MDApp):
                     os.mkdir('Error log')
                     toast("Made by Ranjith")
 
-            first_info = FirstInfoScreen(name='first_info')
-            sm.add_widget(first_info)
+            screens.add_screen('first_info', FirstInfoScreen)
+            # sm.add_widget(first_info)
             change_screen_to('first_info')
         if GPS.configure(raise_error=False):
             button = MDFillRoundFlatButton(text='Close app')
-            button.bind(on_release=sys.exit)
+            button.bind(on_release=lambda *_: sys.exit)
             dialog_type_1('Oh no!',
                           'It seems like GPS is not implemented on your device!!!',
                           [button],
                           dismissible=False,
                           auto_dismiss_on_button_press=False,
                           on_dismiss_callback=lambda *_: sys.exit())  # extra safety
+            # lambda is used to prevent sys.exit getting args and thinking it as an error
         GPS.set_callback(status_change_callback=self.on_status,
                          location_change_callback=self.on_location)
         if GPS.is_configured:

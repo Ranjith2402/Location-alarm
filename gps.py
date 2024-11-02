@@ -27,7 +27,7 @@ class GPS:
         """
         Configures GPS listeners
         :param raise_error: if set False error will be suppressed and returns are error occurred or not
-        :return: boolean GPS configured or not, (NOTE:Boolean is returned only when the raise_error set False otherwise
+        :return: boolean GPS configured, (NOTE: Boolean is returned only when the raise_error set False otherwise
           error is raised)
         """
         is_error = False
