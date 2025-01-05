@@ -668,3 +668,156 @@
             halign: 'center'
             pos_hint: {'top': 0.5 - (dp(50) / root.height), 'center_x': 0.5}
 
+
+
+<PasswordInputScreen>:
+    canvas.before:
+        Color:
+            rgba: 0.1, 0.1, 0.1, 0.2
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    MyLabel:
+        text: 'Enter new password'
+        font_size: dp(32)
+        pos_hint: {'top': 0.9}
+
+    MDTextField:
+        id: password
+        size_hint: 0.8, None
+        icon_left: 'key'
+        pos_hint: {'center_x': 0.5, 'center_y': 0.65}
+        hint_text: 'Enter password'
+        mode: 'rectangle'
+        max_text_length: 16
+        on_focus:
+            help.icon_color = self.line_color_focus if self.focus else self.line_color_normal
+        on_text:
+            root.key_stroke(self, confirm_password, self.text)
+            proceed.disabled = False if 4 <= len(self.text) <= 16 and self.text == confirm_password.text else True
+
+
+    MDIconButton:
+        id: help
+        icon: "help-circle-outline"
+        pos_hint: {"center_y": .65}
+        pos: password.right - self.width + dp(8), 0
+        theme_text_color: 'Custom'
+        icon_color: password.line_color_normal
+
+    MDTextField:
+        id: confirm_password
+        size_hint: 0.8, None
+        icon_left: 'key'
+        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+        hint_text: 'Confirm Password'
+        password: True
+        mode: 'rectangle'
+        on_focus:
+            eye.icon_color = self.line_color_focus if self.focus else self.line_color_normal
+        on_text:
+            root.key_stroke(self, password, self.text)
+            proceed.disabled = False if 4 <= len(self.text) <= 16 and self.text == password.text else True
+
+    MDIconButton:
+        id: eye
+        icon: "eye"
+        pos_hint: {"center_y": .5}
+        pos: confirm_password.right - self.width + dp(8), 0
+        theme_text_color: 'Custom'
+        icon_color: confirm_password.line_color_normal
+        on_release:
+            self.icon = "eye" if self.icon == "eye-off" else "eye-off"
+            confirm_password.password = False if confirm_password.password is True else True
+
+    MDBoxLayout:
+        size_hint: 1, None
+        height: self.minimum_height
+        pos_hint: {'x': confirm_password.x / root.width, 'top': (confirm_password.y - dp(20)) / root.height}
+        MDCheckbox:
+            id: check_box
+            active: True
+            inactive_color: app.theme_cls.primary_color
+            size_hint: None, None
+            size: dp(24), dp(24)
+            pos_hint: {'center_x': 0.5}
+
+        MDLabel:
+            text: 'Remember me'
+            halign: 'left'
+
+    MDFillRoundFlatIconButton:
+        id: proceed
+        disabled: True
+        text: 'Continue'
+        icon: 'arrow-right'
+        pos_hint: {'center_x': 0.5, 'y': 0.1}
+        on_release:
+            root.proceed()
+
+    MDTextButton:
+        pos_hint: {'right': 0.96}
+        on_release:
+            root.check_data_file()
+        pos: self.x, dp(10)
+        markup: True
+        text: '[color=3333ff][u]Recover data[/u][/color]'
+
+
+
+<PasswordLoginScreen>:
+    canvas.before:
+        Color:
+            rgba: 0.1, 0.1, 0.1, 0.2
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    MyLabel:
+        text: 'Enter your password'
+        font_size: dp(32)
+        pos_hint: {'top': 0.9}
+
+    MDTextField:
+        id: password
+        size_hint: 0.8, None
+        icon_left: 'key'
+        pos_hint: {'center_x': 0.5, 'center_y': 0.65}
+        hint_text: 'Enter password'
+        mode: 'rectangle'
+        max_text_length: 16
+        on_focus:
+            help.icon_color = self.line_color_focus if self.focus else self.line_color_normal
+        on_text:
+            proceed.disabled = not root.is_pass_valid()
+
+    MDBoxLayout:
+        size_hint: 1, None
+        height: self.minimum_height
+        pos_hint: {'x': password.x / root.width, 'top': (password.y - dp(20)) / root.height}
+        MDCheckbox:
+            active: True
+            inactive_color: app.theme_cls.primary_color
+            size_hint: None, None
+            size: dp(24), dp(24)
+            pos_hint: {'center_x': 0.5}
+
+        MDLabel:
+            text: 'Remember me'
+            halign: 'left'
+
+    MDFillRoundFlatIconButton:
+        id: proceed
+        disabled: True
+        text: 'Continue'
+        icon: 'arrow-right'
+        pos_hint: {'center_x': 0.5, 'y': 0.1}
+        on_release:
+            root.enter_button()
+
+    MDTextButton:
+        pos_hint: {'right': 0.96}
+        on_release:
+            root.forgot_password()
+        pos: self.x, dp(10)
+        markup: True
+        text: '[color=3333ff][u]Forgot password[/u][/color]'

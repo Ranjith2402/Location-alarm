@@ -2,6 +2,8 @@ import os
 import time
 from typing import Callable
 
+from custom_errors import CommonClass as CustomError
+
 strf_time_format = '%d-%b-%Y at %I-%M-%S%p %z'  # do not use ':' it raises OSError for creating file
 
 
@@ -16,7 +18,7 @@ class ErrorHandler:
         try:
             with open(file_name, 'r') as file:
                 old = file.read()
-                old += '\n\n---------------------------------ENDS---------------------------------\n\n'
+                old += '\n\n' + 'ENDS'.center(80, '-') + '\n\n'
         except FileNotFoundError:
             pass
         with open(file_name, 'w+') as file:
@@ -54,27 +56,36 @@ class ErrorHandler:
         except FileNotFoundError:
             pass
 
-    def call__catch_and_crash(self, func: Callable, raise_error: bool = False):
-        def safe_log_writer(txt: str):
+    def call__catch_and_crash(self, func: Callable, *args, raise_error: bool = False, **kwargs):
+        def safe_log_writer(txt: str = None):
+            if txt is None:
+                import traceback
+                txt = traceback.format_exc()
             try:
                 self.write_log(txt)
             except PermissionError:
                 pass
         try:
-            out = func()
+            out = func(*args, **kwargs)
             return out
         except KeyboardInterrupt:
             pass
+        except CustomError as e:
+            if e.is_write_log:
+                safe_log_writer()
         except SystemExit as e:
             print(e.code)
             if e.code:
-                import traceback
-                safe_log_writer(traceback.format_exc())
+                safe_log_writer()
                 if raise_error:
                     raise
         except Exception as e:
             print(e.args)
-            import traceback
-            safe_log_writer(traceback.format_exc())
+            safe_log_writer()
             if raise_error:
                 raise
+
+    def call_wrapper(self, func):
+        def wrapper(*args, raise_error, **kwargs):
+            self.call__catch_and_crash(func, *args, raise_error=raise_error, **kwargs)
+        return wrapper

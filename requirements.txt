@@ -1,4 +1,4 @@
-plyer==2.1.0
+plyer==2.1.0  # WARNING: use 2.2.dev0 for app development from github
 kivymd==1.0.2
 Kivy==2.3.0
 pyjnius

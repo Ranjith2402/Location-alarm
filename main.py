@@ -1,18 +1,22 @@
-__version__: str = '1.5.1'
+__version__: str = '2.0.0'  # 🥳🥳🥳
 __test_version__: str = 'alpha'
 
 import os
 import re
 import sys
+import json
 import time
 import plyer
 import random
 import webbrowser
 from typing import Callable
 
+import gps
 import data_handler
 import exceptions_handler
-import gps
+from data_handler import password_encrypt
+from jnius_helper import JniusJavaException
+from custom_errors import SaveFailedException
 
 from kivymd.app import MDApp
 from kivymd.toast import toast as _toast
@@ -37,7 +41,8 @@ from kivy.lang.builder import Builder
 from kivy.uix.screenmanager import Screen
 from kivy.core.window import WindowBase, EventLoop
 
-current_screen = previous_screen = 'home'
+
+current_screen = previous_screen = 'signin'
 
 unsigned_float_pattern = r'\d+(?:\.\d+)?'
 decimal_regex_pattern = rf'[+-]?{unsigned_float_pattern}'  # r'[+-]?\d+\.\d+|[+-]?\d+'
@@ -91,7 +96,7 @@ def change_screen_to(screen: str) -> None:
 # Actual screen changing happens here
 def _set_screen(_):
     # sm.current = current_screen
-    screens.change_screen(current_screen)
+    screens.set_screen(current_screen)
 
 
 last_esc_down = 0
@@ -111,6 +116,10 @@ def hook_keyboard(_, key, *__) -> None | bool:
             last_esc_down = time.time()
             toast('Press again to exit')
         return True  # To future me, Returning true is like telling System/App "this stroke is captured"
+    elif key == 13:  # Enter key
+        if screens.screen in ('login', 'signin'):
+            obj = screens.get_current_screen_obj()
+            obj.enter_button()
 
 
 last_toast_msg = ''
@@ -247,23 +256,27 @@ def validate_gps_co_ords(text: str) -> bool:
 
 def dialog_type_1(title: str, msg: str, buttons: list[Button], auto_dismiss_on_button_press: bool = True,
                   dismissible: bool = True, on_dismiss_callback: Callable = None,
-                  extra_callbacks: dict[str, Callable] = None) -> MDDialog:
+                  extra_callbacks: dict[str, Callable] = None, __force_un_dismissible: bool = False) -> MDDialog:
     """
     Creates a dialog box, to interact with user.
     :param title: Dialog title
     :param msg: Message to deliver
     :param buttons: buttons to interact with
     :param auto_dismiss_on_button_press: If set True dismisses dialog box after button press
-    :param dismissible: If set True dismisses dialog even after no button press
+    :param dismissible: If set True dismisses dialog even after no button press (Make sure to give buttons or else True
+    is set automatically)
     :param on_dismiss_callback: Callback after closing dialog,
     :param extra_callbacks: Custom new unknowns callbacks.In the format -> callback_name to callback
+    :param __force_un_dismissible: if you really wanted to create an un-dismissible dialog!
     :return: Dialog
     """
     dialog = MDDialog(
         title=title,
         text=msg,
         buttons=buttons)
-    dialog.auto_dismiss = dismissible if buttons else True  # Make sure to give buttons or else no way to dismiss
+    dialog.auto_dismiss = dismissible if buttons else True
+    if __force_un_dismissible and not dismissible:
+        dialog.auto_dismiss = False
     if auto_dismiss_on_button_press:
         for button in buttons:
             button.bind(on_release=dialog.dismiss)
@@ -299,6 +312,235 @@ def delete_log(_=None):
         error_handler.delete_error_log(error_handler.list_log_files()[0])
     except IndexError:  # FileNotFoundError is already handled
         pass
+
+
+def common_pass_check(password: str):
+    """
+    Function to test password validity by maintaining the consistency
+    :param password: password what else
+    :return: bool
+    """
+    return True if 4 <= len(password) <= 16 else False
+
+
+class UserData:
+    if platform == 'win':
+        # FIXME: remove this
+        _file_path = './tmp files'
+        _data_file = os.path.join(_file_path, secret_data['user-data-file-name'])
+        _backup_file = os.path.join(_file_path, secret_data['user-data-backup-file-name'])  # :)
+    else:
+        _file_path = os.path.join(*secret_data['user-data-file-path'])
+        _data_file = os.path.join(_file_path, secret_data['user-data-file-name'])
+        _backup_file = os.path.join(_file_path, secret_data['user-data-backup-file-name'])
+
+    def __init__(self):
+        self.data_locker = data_handler.CryptoLocker(secret_data['key-store-keyAlias'])
+        self.__password = secret_data['key-store-password']
+        self.__data: dict = {}
+        # if self.__password is not None:
+        #     raise
+        #     if self.data_locker.check_password(self.__password):
+        #         encrypted_text = self.__load_data()
+        #         decrypted_text = self.data_locker.decrypt_text(encrypted_text, self.__password)
+        #         try:
+        #             self._data = json.loads(decrypted_text)
+        #         except json.JSONDecoder:
+        #             button = MDRaisedButton(text='Exit app')
+        #             button.bind(on_release=lambda *_: sys.exit())
+        #             button.bind(on_release=lambda *_: exit())
+        #             dialog_type_1(title="Error",
+        #                           msg='Unable to decode data: \'JSONDecodeError\', please restart the app again.',
+        #                           buttons=[button],
+        #                           auto_dismiss_on_button_press=False,
+        #                           dismissible=False,
+        #                           __force_un_dismissible=True,
+        #                           on_dismiss_callback=lambda *_: sys.exit())
+        #     else:
+        #         self._data = None
+        # else:
+        #     self._data = None
+
+    def __load_data(self) -> str:
+        """
+        Loads encrypted data stored in files (From Internal Shared storage)
+        :return: scrambled text (Encrypted one)
+        """
+        try:
+            with open(self._data_file, 'r') as file:
+                return file.read()
+        except FileNotFoundError:
+            out = self.__load_backup_data()
+            if out is not None:
+                return out
+            else:
+                pass
+        except PermissionError:
+            pass
+        except OSError:
+            pass
+
+    def __load_backup_data(self) -> str:
+        """
+        DO NOT USE FROM OUTSIDE
+        :return:
+        """
+        try:
+            with open(self._backup_file, 'r') as file:
+                return file.read()
+        except FileNotFoundError:
+            pass
+        except PermissionError:
+            pass
+        except OSError:
+            pass
+
+    def __save_backup_data(self, data: str) -> bool:
+        try:
+            with open(self._backup_file, 'w+') as file:
+                file.write(data)
+            return True
+        except (PermissionError, OSError):
+            return False
+
+    def __save_data(self, data: str):
+        """
+        Saves data, remember to give an encrypted version of data
+        :return: None
+        """
+        try:
+            with open(self._data_file, 'w+') as file:
+                file.write(data)
+            self.__save_backup_data(data)
+        except (PermissionError, OSError) as e:
+            if self.__save_backup_data(data):  # try to save backup data
+                pass
+            else:
+                raise SaveFailedException(f"Unable to save user data: {e.args}")
+
+    @property
+    def password(self):
+        raise TypeError("Cannot get password")
+
+    @password.setter
+    def password(self, value: str):
+        """
+        Only set encrypted password
+        :param value:
+        :return:
+        """
+        self.__password = value
+
+    def save_password(self):
+        secret_data['key-store-password'] = self.__password
+
+    def create_data_file(self):
+        try:
+            if platform == 'win':
+                files = os.listdir('.')  # TODO: Remove this code
+            else:
+                files = os.listdir(self._file_path)
+            if secret_data['user-data-file-name'] in files:
+                os.remove(self._data_file)
+            if secret_data['user-data-backup-file-name'] in files:
+                os.remove(self._backup_file)
+            self.save_data_file()
+        except PermissionError:
+            raise
+
+    def save_data_file(self):
+        """
+        Saves current snapshot of the data
+        :return: Nothing
+        """
+        if platform == 'android':
+            json_str = json.dumps(self.__data)
+            encoded_str: str = self.data_locker.encrypt_text(json_str, self.__password)
+            self.__save_data(encoded_str)
+        else:
+            self.__save_data(json.dumps({'Somewhere in the universe': [(0.0, 0.0), 50],  # FIXME: remove this
+                                                                                         #      while making app
+                                         'Out there in the cosmos': [(90.0, 90.0), 250]}))
+
+    def check_password(self, password: str) -> bool:
+        """
+        Checks both the user entered and saved password
+        :param password:
+        :return: True, if password matches else False
+        :rtype: bool
+        """
+        if platform == 'win':
+            return password == secret_data['key-store-password']
+        else:
+            return self.data_locker.check_password(password)
+
+    def load_user_data(self):
+        """
+        Decrypts and sets data variable
+        :return: Nothing
+        """
+        try:
+            enc_data = self.__load_data()
+            if platform == 'win':
+                decrypt_data = enc_data
+            else:
+                decrypt_data = self.data_locker.decrypt_text(enc_data, self.__password)
+            self.__data: dict = json.loads(decrypt_data)
+        except json.decoder.JSONDecodeError:
+            stop = MDRaisedButton(text='Exit')
+            ignore = MDFlatButton(text='Continue anyway')
+            stop.bind(on_release=lambda *_: exit())
+            stop.bind(on_release=lambda *_: sys.exit())
+            dialog_type_1(title='Oh on!',
+                          msg='Unable to decode data "JSONDecodeError" please restart the app, '
+                              'if this error persists try re-installing the app '
+                              '(Continuing to app may cause unwanted behaviour)',
+                          buttons=[ignore, stop],
+                          dismissible=False)
+            ignore.bind(on_release=lambda *_: change_screen_to('home'))
+
+    def is_password_present(self) -> bool:
+        return self.__password is not None
+
+    def decode_and_decide_screen(self):
+        if self.check_data_file():
+            if self.__password is not None:
+                try:
+                    if self.check_password(self.__password):
+                        self.load_user_data()
+                        change_screen_to('home')
+                    else:
+                        raise JniusJavaException
+                except JniusJavaException:
+                    ok = MDRaisedButton(text='OK')
+                    change_screen_to('login')
+                    dialog_type_1(title='Oh no!',
+                                  msg='It seems that the stored password is corrupted,'
+                                      'You need to enter password again',
+                                  buttons=[ok])
+            else:
+                change_screen_to('login')
+        else:
+            if self.__password is not None:
+                ok = MDRaisedButton(text='OK')
+                dialog_type_1(title='Error :(',
+                              msg='Password present but unable to locate data file, your data is maybe unrecoverable, '
+                                  'sorry for the inconvenience',
+                              buttons=[ok])
+                self.create_data_file()
+                change_screen_to('home')
+            else:
+                change_screen_to('signin')
+
+    def check_data_file(self) -> bool:
+        try:
+            files = os.listdir(self._file_path)
+            return secret_data['user-data-file-name'] in files or secret_data['user-data-backup-file-name'] in files
+        except FileNotFoundError:
+            os.mkdir(self._file_path)
+            return False
+        except (OSError, PermissionError):
+            return False
 
 
 class WeeksToggleButtons(MDBoxLayout):
@@ -480,6 +722,99 @@ class AlarmExpansionPanel(MDExpansionPanel):
     def _remove(self, *_):
         self._reset_scroll()
         self.parent.remove_widget(self)  # goodbye
+
+
+class PasswordInputScreen(MDScreen):
+    def on_enter(self, *args):
+        pass
+
+    @staticmethod
+    def key_stroke(_from, _to, text):
+        """
+        Checks every keystroke and switches focus to '_to' if it is a tab
+        :param _from:
+        :param _to:
+        :param text:
+        :return:
+        """
+        try:
+            key = text[-1]
+        except (KeyError, IndexError):
+            return
+        if key == '\t':
+            _from.text = text[:-1]  # removes tab
+            _from.focus = False
+            _to.focus = True
+
+    def proceed(self):
+        password_field = self.ids['password']
+        confirm_field = self.ids['confirm_password']
+
+        password: str = password_field.text
+        confirm_password = confirm_field.text
+
+        if common_pass_check(password) and password == confirm_password:
+            pass
+        else:
+            self.ids['proceed'].disabled = True
+            return  # maybe mistakenly pressed/enabled
+        user_data.password = password_encrypt(password)
+        if self.ids['check_box'].active:
+            user_data.save_password()
+        user_data.create_data_file()
+        change_screen_to('home')
+        ok = MDRaisedButton(text='I Understood')
+        dialog_type_1(title='Note',
+                      msg='Please remember this password, '
+                          'In case you re-installed this app you need to enter this password to recover data',
+                      buttons=[ok],
+                      dismissible=False)
+
+    def enter_button(self):
+        if self.ids['password'].focus:
+            self.ids['password'].focus = False
+            self.ids['confirm_password'].focus = True
+        elif self.ids['confirm_password'].focus:
+            self.ids['confirm_password'].focus = False
+            self.proceed()
+
+    @staticmethod
+    def check_data_file():
+        if user_data.check_data_file():
+            change_screen_to('login')
+        else:
+            ok = MDRaisedButton(text='OK')
+            dialog_type_1(title='No Data',
+                          msg='Unable to find old data file!, Please login to create one',
+                          buttons=[ok])
+
+
+class PasswordLoginScreen(MDScreen):
+    def enter_button(self):
+        password = self.ids['password'].text
+        if not self.is_pass_valid():
+            return
+        if user_data.check_password(password_encrypt(password)):
+            user_data.password = password_encrypt(password)
+            if self.ids['check_box'].active:
+                user_data.save_password()
+            user_data.load_user_data()
+            change_screen_to('home')
+        else:
+            self.ids['password'].helper_text = 'Wrong password!'
+            self.ids['password'].error = True
+
+    def is_pass_valid(self):
+        return common_pass_check(self.ids['password'].text)
+
+    @staticmethod
+    def forgot_password():
+        ok = MDRaisedButton(text='I understood')
+        no = MDFlatButton(text='I know password')
+        dialog_type_1(title='Note',
+                      msg='Remember, old data will be lost without password!!!',
+                      buttons=[no, ok])
+        ok.bind(on_release=lambda *_: change_screen_to('signin'))
 
 
 class LoadingScreen(MDScreen):
@@ -704,7 +1039,15 @@ class MyScreenManager:
 
         self.__screens_to_render = {}
 
-    def change_screen(self, target_screen: str) -> None:
+    @property
+    def screen(self):
+        return self.screen_manager.current
+
+    @screen.setter
+    def screen(self, value: str):
+        self.set_screen(value)
+
+    def set_screen(self, target_screen: str) -> None:
         """
         Changes sets current screen to target screen\n
         Note: Must be called in from kivy thread
@@ -737,6 +1080,9 @@ class MyScreenManager:
             self.__rendered_screens.append(screen_name)
             return screen
 
+    def get_current_screen_obj(self):
+        return self.get_screen(self.screen)
+
     def add_screen(self, screen_name: str, cls, _overwrite: bool = False) -> None:
         """
         Adds screen name and class to future rendering items
@@ -748,7 +1094,7 @@ class MyScreenManager:
         """
         if screen_name in self.__screens_to_render:
             if not _overwrite:
-                raise KeyError("This screen name already exists!")
+                raise KeyError(f"{screen_name} this screen already exists!")
         self.__screens_to_render[screen_name] = cls
 
     def _render_all(self):
@@ -856,19 +1202,22 @@ class MainApp(MDApp):
         else:
             send_without_log()
 
-    @staticmethod
-    def on_location():
-        pass
-
-    @staticmethod
-    def on_status():
-        pass
-
     def on_start(self):
         global __log_to_send
         WindowBase.softinput_mode = 'below_target'
         WindowBase.on_maximize = lambda x=None: print(x, 'maximised')
         WindowBase.on_restore = lambda x=None: print(x, 'window restore')
+        is_first_login = False
+        if GPS.configure(raise_error=False):
+            button = MDFillRoundFlatButton(text='Close app')
+            button.bind(on_release=lambda *_: sys.exit())
+            dialog_type_1('Oh no!',
+                          'It seems like GPS is not implemented on your device!!!',
+                          [button],
+                          dismissible=False,
+                          auto_dismiss_on_button_press=False,
+                          on_dismiss_callback=lambda *_: sys.exit())  # extra safety
+            # lambda is used, to prevent sys.exit getting args and thinking it as an error
         try:
             files = error_handler.list_log_files(raise_folder_not_found=True)
             if files:
@@ -888,30 +1237,30 @@ class MainApp(MDApp):
                 __log_to_send = ''  # I don't think this is needed but without this send_feedback function will break
                 # And the app will crash :(, IDK why
         except FileNotFoundError:
+            is_first_login = True
+
             class FirstInfoScreen(MDScreen):
                 @staticmethod
                 def agree():
-                    change_screen_to('home')
+                    change_screen_to('loading')
                     os.mkdir('Error log')
                     toast("Made by Ranjith")
+                    if user_data.check_data_file():
+                        yes = MDRaisedButton(text='Yes')
+                        yes.bind(on_release=lambda *_: change_screen_to('login'))
+                        no = MDFlatButton(text='No thanks', theme_text_color='Custom', text_color=(1, 0.2, 0.2, 1))
+                        no.bind(on_release=lambda *_: change_screen_to('signin'))
+                        dialog_type_1(title='Data Recovery',
+                                      msg='Old data was found in this device, do you want to recover?',
+                                      buttons=[no, yes])
 
             screens.add_screen('first_info', FirstInfoScreen)
             # sm.add_widget(first_info)
+
+        if is_first_login:
             change_screen_to('first_info')
-        if GPS.configure(raise_error=False):
-            button = MDFillRoundFlatButton(text='Close app')
-            button.bind(on_release=lambda *_: sys.exit)
-            dialog_type_1('Oh no!',
-                          'It seems like GPS is not implemented on your device!!!',
-                          [button],
-                          dismissible=False,
-                          auto_dismiss_on_button_press=False,
-                          on_dismiss_callback=lambda *_: sys.exit())  # extra safety
-            # lambda is used to prevent sys.exit getting args and thinking it as an error
-        GPS.set_callback(status_change_callback=self.on_status,
-                         location_change_callback=self.on_location)
-        if GPS.is_configured:
-            GPS.start()
+        else:
+            user_data.decode_and_decide_screen()
 
         # app.theme_cls.bg
         EventLoop.window.bind(on_keyboard=hook_keyboard)
@@ -922,7 +1271,7 @@ class MainApp(MDApp):
         # palette = random.choice(['Red', 'Pink', 'Purple', 'DeepPurple', 'Indigo', 'Blue', 'DeepOrange', 'Teal',
         #                          'Green', 'LightGreen', 'Lime', 'Yellow', 'Amber', 'Orange', 'LightBlue', 'Cyan'])
         # self.theme_cls.primary_palette = palette
-        self.theme_cls.primary_palette = 'Blue'
+        self.theme_cls.primary_palette = 'Teal'
         # print(palette)
         # self.theme_cls.primary_palette = 'Teal'
         # ['Red', 'Pink', 'Purple', 'DeepPurple', 'Indigo', 'Blue', 'DeepOrange', 'Teal', 'Brown', 'BlueGray']
@@ -930,6 +1279,10 @@ class MainApp(MDApp):
         # Don't use below colors (These colors changes text color to black, wiz not suitable for dark mode)
         # 'Green', 'LightGreen', 'Lime', 'Yellow', 'Amber', 'Orange',  'LightBlue',  'Cyan',  'Gray'
         return sm
+
+    @error_handler.call_wrapper
+    def run(self):
+        super().run()
 
 
 if __name__ == '__main__':
@@ -944,8 +1297,13 @@ if __name__ == '__main__':
     screens.add_screen('settings', SettingsScreen)
     screens.add_screen('saved_locations', SavedLocationsScreen)
     screens.add_screen('new_location', AddNewLocationScreen)
+    screens.add_screen('login', PasswordLoginScreen)
+    screens.add_screen('signin', PasswordInputScreen)
 
+    screens.set_screen('loading')
     screens.get_screen('home')
+
+    user_data = UserData()
     # secret_data._render_all()
 
     # home = HomeScreen(name='home')
@@ -963,4 +1321,4 @@ if __name__ == '__main__':
     # sm.current = 'new_location'
 
     # TODO: Make raise_error to False for production, disabled for debugging
-    error_handler.call__catch_and_crash(app.run, raise_error=True)  # platform != 'android')
+    app.run(raise_error=True)  # platform != 'android')
