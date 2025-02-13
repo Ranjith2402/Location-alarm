@@ -4,10 +4,9 @@ import random
 from hashlib import sha256, sha384
 
 from custom_errors import SaveFailedException, MissingFileError
-from jnius_helper import autoclass, JniusJavaException
+from jnius_helper import autoclass, JniusJavaException, String
 from tools import Constants
 
-String = autoclass('java.lang.String')
 KeyStore = autoclass('java.security.KeyStore')
 KeyGenerator = autoclass('javax.crypto.KeyGenerator')
 Cipher = autoclass('javax.crypto.Cipher')

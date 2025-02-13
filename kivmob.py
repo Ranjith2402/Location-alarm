@@ -3,6 +3,8 @@ This file and other two java files
 Copied from https://vucavucalife.com/kivy-trials-and-tribulations-of-integrating-admob-ads-into-an-android-app/
 Also used as reference for buildozer.spec
 Thank you so much
+
+!!!This is NOT MY CODE!!!
 """
 
 

@@ -1,4 +1,4 @@
-__version__: str = '2.0.0'  # 🥳🥳🥳
+__version__: str = '2.1.0'
 __test_version__: str = 'alpha'
 
 import os
@@ -11,9 +11,13 @@ import random
 import webbrowser
 from typing import Callable
 
+from geopy.exc import GeocoderUnavailable
+
 import gps
 import data_handler
 import exceptions_handler
+from tools import Constants
+from geocoding import GeocoderClient
 from data_handler import password_encrypt
 from jnius_helper import JniusJavaException
 from custom_errors import SaveFailedException
@@ -82,6 +86,7 @@ secret_data = data_handler.SecreteData()
 __version__ += " " * (bool(__test_version__)) + __test_version__  # Adds <space> and version if __test_version__ present
 
 GPS = gps.GPS()
+geocoding_client = GeocoderClient()
 
 
 # Kivy doesn't allow changing screen from outer thread other than kivy's (tested on windows)
@@ -105,7 +110,7 @@ last_esc_down = 0
 # Response every keystroke including esc button
 def hook_keyboard(_, key, *__) -> None | bool:
     global last_esc_down
-    if key == 27:  # Esc button on Windows and back button on Android
+    if key == Constants.ESCAPE_CODE:  # Esc button on Windows and back button on Android
         if sm.current in ('settings', 'saved_locations'):
             change_screen_to('home')
         elif sm.current in ('new_location',):
@@ -116,10 +121,13 @@ def hook_keyboard(_, key, *__) -> None | bool:
             last_esc_down = time.time()
             toast('Press again to exit')
         return True  # To future me, Returning true is like telling System/App "this stroke is captured"
-    elif key == 13:  # Enter key
+    elif key == Constants.ENTER_CODE:  # Enter key
         if screens.screen in ('login', 'signin'):
             obj = screens.get_current_screen_obj()
             obj.enter_button()
+        elif screens.screen in ('new_location',):
+            obj = screens.get_current_screen_obj()
+            obj.get_location_info()
 
 
 last_toast_msg = ''
@@ -135,7 +143,7 @@ def toast(msg: str) -> None:
     last_toast_msg = msg
 
 
-def regex_match_gps(text: str) -> list:
+def regex_match_gps(text: str) -> list[list[str]]:
     """
     Returns GPS co-ordinates in a given string
     :param text: input string
@@ -212,45 +220,57 @@ def validate_gps_cord(lat: str, lng: str) -> bool:
         return False
 
 
-def validate_gps_co_ords(text: str) -> bool:
+def split_lat_lng(text: str) -> tuple[float: 2] | None:
     """
-    Validates GPS co-ordinates of any format
-    :param text: Co-ordinates make sure to send capitalized text
-    :return: boolean; True if it is valid, else False
+    Split GPS cords of any format into latitude and longitude
+    :param text:
+    :return:
     """
     text = text.upper()
     regex_cords = regex_match_gps(text)
-    for ind, match in enumerate(regex_cords):
+    for index, match in enumerate(regex_cords):
         if match:
             break
     else:
-        return False  # No match (for loop ended normally without breaking)
+        return None  # No match (for loop ended normally without breaking)
     if len(match) != 2:  # there are more or less items (2 -> 1 latitude and 1 longitude)
-        if ind == 1 and len(match) == 1 and len(regex_cords[-1]) == 2:  # This case will solve problem like
-            # '12.34 56.78' this is GPS co-ord in decimal from, but it also matches with DMS of sign format
-            ind = 2
-            match: list = regex_cords[-1]
+        if index == 1 and len(match) == 1 and len(regex_cords[-1]) == 2:  # This case will solve problem like
+            # '12.34 56.78' this is GPS co-ord in decimal from, but it also matches with DMS sign format
+            index = 2
+            match: list[str] = regex_cords[-1]
         else:
-            return False
-    if ind < 2:  # Match index varies according to input format (<2 means It is in DMS format)
+            return None
+    if index < 2:  # Match index varies according to input format (<2 means It is in DMS format)
         split_lat = split_gps_deci_str(match[0])
         split_lng = split_gps_deci_str(match[1])
-        if ind == 0:
+        if index == 0:
             # check the last letter, In-case they are swapped
             if match[0][-1] in ('S', 'N') and match[1][-1] in ('E', 'W'):
                 pass
             elif match[0][-1] in ("E", "W") and match[1][-1] in ("N", "S"):
                 split_lat, split_lng = split_lng, split_lat  # latitude and longitude are swapped
             else:
-                return False
+                return None
         if len(split_lat) == len(split_lng) == 4:  # 4 -> deg + min + sec + direction
             lat = convert_gps_to_decimal_degree(*split_lat)
             lng = convert_gps_to_decimal_degree(*split_lng)
         else:
-            return False
+            return None
     else:
         lat, lng = match
+    return lat, lng
 
+
+def validate_gps_co_ords(text: str) -> bool:
+    """
+    Validates GPS co-ordinates of any format
+    :param text: Co-ordinates make sure to send capitalized text
+    :return: boolean; True if it is valid, else False
+    """
+    out = split_lat_lng(text)
+    if out is None:
+        return False
+    lat, lng = out
     return validate_gps_cord(lat, lng)
 
 
@@ -432,7 +452,7 @@ class UserData:
         self.__password = value
 
     def save_password(self):
-        secret_data['key-store-password'] = self.__password
+        secret_data['key-store-password'] = self.__password  # auto save enabled
 
     def create_data_file(self):
         try:
@@ -994,29 +1014,106 @@ class AddNewLocationScreen(MDScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(args, **kwargs)
         self.drop_down_menu = None
+        self.post_proc_arg = None
 
     def on_enter(self):
         self.ids['ess_content'].refresh_week_buttons()
 
-    def validate_gps_cords(self):
+    def validate_gps_cords(self) -> bool:
         if self.ids['cords_in'].focus:
-            return
+            return False
         txt = self.ids['cords_in'].text.upper()
         if txt == '':
-            return
+            return False
         try:
             # out = split_gps_deci_str(txt)
             # if len(out) != 2:
             #     raise KeyError
             # lat, lng = out[0], out[1]
-            self.ids['cords_in'].error = not validate_gps_co_ords(txt)
+            out = validate_gps_co_ords(txt)
+            self.ids['cords_in'].error = not out  # Not-Out yeahhh  🏏🥳
+            return out
         except (KeyError, TypeError, ValueError) as e:
             print('Error while validating gps cords')
             print(e)
-        else:
-            # if no error
-            return
         self.ids['cords_in'].error = True
+        return False
+
+    def get_location_info(self) -> None:
+        """
+        This function is called by a non-kivy thread and uses kivy feature which must be used within the kivy thread
+        Used for both geocode and reverse-geocode (Auto switch), relies on button is_reverse variable
+        :return: None
+        """
+        self.location_input()  # sometime button is not updated properly this manually updates the button
+        if self.ids['get_button'].is_reverse:
+            if self.validate_gps_cords():
+                try:
+                    text = self.ids['cords_in'].text
+                    out = split_lat_lng(text)
+                    if out is None:
+                        return
+                    lat, lng = map(float, out)
+                    out, is_cached = geocoding_client.reverse_geocode(lat, lng)
+                    if out is None:
+                        self.ids['location_name'].helper_text = 'Unknown Location!'
+                        self.ids['location_name'].error = True
+                        return
+                    name: str = out.address
+                    self.post_proc_arg = name
+                    Clock.schedule_once(self.post_process_text, 0.0)
+                    if is_cached:  # if the data is retrieved from cache, then quickly enable the button
+                        self.ids['get_button'].kill_all_threads()
+                except ValueError:
+                    # we're already tested this while validating, and probably never called
+                    dialog_type_1(title='Something went wrong',
+                                  msg='Something unexpected happened while phrasing co-ordinates, please try again',
+                                  buttons=MDFlatButton(text='ok'))
+                except GeocoderUnavailable:
+                    self.ids['location_name'].helper_text = 'No Internet!'
+                    self.ids['location_name'].error = True
+            else:
+                self.ids['get_button'].kill_all_threads()
+        else:
+            try:
+                text = self.ids['location_name'].text.strip()
+                out, is_cached = geocoding_client.geocode(text)
+                if out is None:
+                    self.ids['location_name'].helper_text = 'Unknown Location!'
+                    self.ids['location_name'].error = True
+                    return
+                name: str = f'{out.latitude}, {out.longitude}'
+                self.post_proc_arg = name
+                Clock.schedule_once(self.post_process_cords, 0.0)
+                if is_cached:  # if the data is retrieved from cache, then quickly enable the button
+                    self.ids['get_button'].kill_all_threads()
+            except GeocoderUnavailable:
+                self.ids['location_name'].helper_text = 'No Internet!'
+                self.ids['location_name'].error = True
+
+    def post_process_text(self, *_):
+        self.ids['location_name'].text = self.post_proc_arg
+        self.reset_text_field_error_stat()
+
+    def post_process_cords(self, *_):
+        self.ids['cords_in'].text = self.post_proc_arg
+        self.reset_text_field_error_stat()
+
+    def reset_text_field_error_stat(self):
+        self.ids['location_name'].error = False
+        self.ids['cords_in'].error = False
+
+        self.validate_gps_cords()  # incase cords were wrong
+
+    def location_input(self):  # function name doesn't make sense thou
+        location_text = self.ids['location_name'].text.strip()
+        co_ords_text = self.ids['cords_in'].text.strip()
+        if location_text == '' or co_ords_text != '':
+            self.ids['get_button'].is_reverse = True
+            self.ids['get_button'].text = 'Get name'
+        else:
+            self.ids['get_button'].is_reverse = False
+            self.ids['get_button'].text = 'Get co-ordinates'
 
 
 class MyScreenManager:
@@ -1202,13 +1299,23 @@ class MainApp(MDApp):
         else:
             send_without_log()
 
+    @staticmethod
+    def escape_button():
+        """
+        Used by frontend app
+        :return:
+        """
+        global last_esc_down
+        last_esc_down = 0  # making sure that this isn't combine with real back/escape button
+        hook_keyboard(None, Constants.ESCAPE_CODE)
+
     def on_start(self):
         global __log_to_send
         WindowBase.softinput_mode = 'below_target'
         WindowBase.on_maximize = lambda x=None: print(x, 'maximised')
         WindowBase.on_restore = lambda x=None: print(x, 'window restore')
         is_first_login = False
-        if GPS.configure(raise_error=False):
+        if GPS.configure(raise_error=False) and False:
             button = MDFillRoundFlatButton(text='Close app')
             button.bind(on_release=lambda *_: sys.exit())
             dialog_type_1('Oh no!',
@@ -1301,7 +1408,7 @@ if __name__ == '__main__':
     screens.add_screen('signin', PasswordInputScreen)
 
     screens.set_screen('loading')
-    screens.get_screen('home')
+    screens.get_screen('home')  # preloading home screen
 
     user_data = UserData()
     # secret_data._render_all()

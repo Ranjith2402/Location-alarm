@@ -1,8 +1,9 @@
 """
-Since jinus is not works on Windows, this files helps debugging easy and not have any special impact whatsoever
+Since jnius won't work on Windows, this files makes debugging easy and not have any special impact whatsoever
 """
 
-__all__ = ('autoclass', "java_method", 'PythonJavaClass', 'mActivity', 'PythonActivity', 'jnius', 'JniusJavaException')
+__all__ = ('autoclass', "java_method", 'PythonJavaClass', 'mActivity', 'PythonActivity', 'jnius', 'JniusJavaException',
+           'String')
 
 from kivy.utils import platform
 
@@ -12,9 +13,13 @@ if platform == 'android':
     JniusJavaException = jnius.jnius.JavaException  # noqa
     PythonActivity = autoclass('org.kivy.android.PythonActivity')
     mActivity = PythonActivity.mActivity
+    String = autoclass('java.lang.String')
 else:
-
+    # Below code is to run on a non-android device
     JniusJavaException = Exception
+
+    def String(_: str):  # NOQA
+        return _
 
     def java_method(*_, **__):
         pass

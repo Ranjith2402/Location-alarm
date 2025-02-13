@@ -4,7 +4,8 @@
 #: import dp kivy.metrics.dp
 #: import ScrollEffect kivy.effects.scroll.ScrollEffect
 #: import Clipboard kivy.core.clipboard.Clipboard
-#: import MySwitch MySwitch.MySwitch
+#: import MySwitch CustomElements.MySwitch
+#: import LagRectangleFlatButton CustomElements.LagRectangleFlatButton
 
 
 
@@ -525,13 +526,20 @@
         orientation: 'vertical'
         padding: '8dp'
         spacing: '18dp'
-        MDLabel:
-            size_hint_y: None
-            height: self.texture_size[1]
-            text: 'Add reminder'
-            font_style: 'H5'
-            pos_hint: {'top': 0.98}
-            valign: 'top'
+        MDBoxLayout:
+            size_hint: 1, None
+            height: self.minimum_height
+            MDIconButton:
+                icon: 'arrow-left'
+                pos_hint: {'top': 1.2}
+                on_press: app.escape_button()
+            MDLabel:
+                size_hint_y: None
+                height: self.texture_size[1]
+                text: 'Add reminder'
+                font_style: 'H5'
+                pos_hint: {'top': 0.98}
+                valign: 'top'
         ScrollView:
             MDBoxLayout:
                 orientation: 'vertical'
@@ -547,6 +555,8 @@
                         hint_text: 'GPS co-ords'
                         id: cords_in
                         on_focus: root.validate_gps_cords()
+                        on_focus: root.location_input()
+                        on_text: root.location_input()
                         helper_text: 'Invalid GPS co-ordinates'
                         helper_text_mode: 'on_error'
                         # max_text_length: 30
@@ -571,11 +581,17 @@
                     spacing: dp(10)
                     padding: 0, 0, 0, dp(32)
                     MDTextField:
+                        id: location_name
                         hint_text: 'Location name'
-                    MDRectangleFlatButton:
+                        # on_focus: root.reset_text_field_error_stat()
+                        on_text: root.location_input()
+                        helper_text_mode: 'on_error'
+                    LagRectangleFlatButton:
+                        id: get_button
                         pos_hint: {'center_y':0.5}
                         text: 'Get name'
-                        on_release: app.toast(fun=True, id_='6')
+                        is_reverse: True
+                        lag_function: root.get_location_info
                 EssentialContent:
                     id: ess_content
                     spacing: dp(32)

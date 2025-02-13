@@ -1,13 +1,13 @@
 [app]
 
 # (str) Title of your application
-title = KivMob
+title = Location Alarm
 
 # (str) Package name
-package.name = test
+package.name = location
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = ranji.kivmob
+package.domain = ranji.dev
 
 # (str) Source code where the main.py live
 source.dir = .
@@ -29,7 +29,7 @@ source.include_exts = py,png,jpg,kv,atlas
 #source.exclude_patterns = license,images/*/*.jpg
 
 # (str) Application versioning (method 1)
-version = 0.1
+version = 2.1.0
 
 # (str) Application versioning (method 2)
 # version.regex = __version__ = ['"](.*)['"]
@@ -37,7 +37,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy==2.2.0, kivymd==1.0.2, pillow==9.2.0, certify, pyjnius
+requirements = python3,kivy==2.3.0, kivymd==1.0.2, pillow==9.4.0, certifi, pyjnius, git+https://github.com/Ranjith2402/plyer, android
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -95,16 +95,16 @@ fullscreen = 0
 
 # (list) Permissions
 # (See https://python-for-android.readthedocs.io/en/latest/buildoptions/#build-options-1 for all the supported syntaxes and properties)
-#android.permissions = android.permission.INTERNET, (name=android.permission.WRITE_EXTERNAL_STORAGE;maxSdkVersion=18)
+android.permissions = android.permission.INTERNET, android.permission.WRITE_EXTERNAL_STORAGE
 
 # (list) features (adds uses-feature -tags to manifest)
 #android.features = android.hardware.usb.host
 
 # (int) Target Android API, should be as high as possible.
-#android.api = 31
+android.api = 31
 
 # (int) Minimum API your APK / AAB will support.
-#android.minapi = 21
+android.minapi = 29
 
 # (int) Android SDK version to use
 #android.sdk = 20
@@ -177,7 +177,7 @@ fullscreen = 0
 
 # (list) List of Java files to add to the android project (can be java or a
 # directory containing the files)
-#android.add_src =
+android.add_src = ./java_files/
 
 # (list) Android AAR archives to add
 #android.add_aars =
@@ -284,6 +284,8 @@ fullscreen = 0
 # (list) The Android archs to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
 # In past, was `android.arch` as we weren't supporting builds for multiple archs at the same time.
 android.archs = arm64-v8a
+# android.archs = armeabi-v7a
+# android.archs = arm64-v8a, armeabi-v7a
 
 # (int) overrides automatic versionCode computation (used in build.gradle)
 # this is not the same as app version and should only be edited if you know what you're doing

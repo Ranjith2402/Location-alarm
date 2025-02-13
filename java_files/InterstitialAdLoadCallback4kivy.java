@@ -1,9 +1,6 @@
-"""
-Interstitial was added just in case
-"""
+// !!! This is NOT MY CODE !!!
 
-
-package org.test.kivmob_test;
+package ranji.dev.location;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import com.google.android.gms.ads.LoadAdError;

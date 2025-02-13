@@ -1,4 +1,4 @@
-package ranji.dev.cryptoLocker;
+package ranji.dev.location;  // must match with the package name
 
 import javax.crypto.*;
 import javax.security.auth.DestroyFailedException;
