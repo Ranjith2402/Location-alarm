@@ -13,7 +13,7 @@ package.domain = ranji.dev
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-source.include_exts = py,png,jpg,kv,atlas
+source.include_exts = py,png,jpg,kv,atlas,json
 
 # (list) List of inclusions using pattern matching
 #source.include_patterns = assets/*,images/*.png
@@ -37,7 +37,7 @@ version = 2.1.0
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy==2.3.0, kivymd==1.0.2, pillow==9.4.0, certifi, pyjnius, git+https://github.com/Ranjith2402/plyer, android
+requirements = python3,kivy==2.3.0, kivymd==1.0.2, pillow==9.4.0, certifi, pyjnius, git+https://github.com/Ranjith2402/plyer, android, geopy
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -95,16 +95,16 @@ fullscreen = 0
 
 # (list) Permissions
 # (See https://python-for-android.readthedocs.io/en/latest/buildoptions/#build-options-1 for all the supported syntaxes and properties)
-android.permissions = android.permission.INTERNET, android.permission.WRITE_EXTERNAL_STORAGE
+android.permissions = android.permission.INTERNET, android.permission.ACCESS_NETWORK_STATE, android.permission.ACCESS_COARSE_LOCATION, android.permission.ACCESS_FINE_LOCATION, android.permission.ACCESS_BACKGROUND_LOCATION
 
 # (list) features (adds uses-feature -tags to manifest)
 #android.features = android.hardware.usb.host
 
 # (int) Target Android API, should be as high as possible.
-android.api = 31
+#android.api = 31
 
 # (int) Minimum API your APK / AAB will support.
-android.minapi = 29
+#android.minapi = 21
 
 # (int) Android SDK version to use
 #android.sdk = 20

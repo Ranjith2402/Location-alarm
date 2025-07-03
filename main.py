@@ -1,16 +1,17 @@
-__version__: str = '2.1.0'
+__version__: str = '2.2.0'
 __test_version__: str = 'alpha'
 
 import os
 import re
 import sys
+import ssl
 import json
 import time
 import plyer
 import random
+import certifi
 import webbrowser
-from typing import Callable
-
+from typing import Callable, NoReturn
 from geopy.exc import GeocoderUnavailable
 
 import gps
@@ -44,6 +45,15 @@ from kivy.animation import Animation
 from kivy.lang.builder import Builder
 from kivy.uix.screenmanager import Screen
 from kivy.core.window import WindowBase, EventLoop
+
+
+# usual ritual to access the internet on android
+context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
+
+context.load_verify_locations(certifi.where())  # system CA files
+context.verify_mode = ssl.CERT_REQUIRED
+
+ssl._create_default_https_context = lambda *x: context
 
 
 current_screen = previous_screen = 'signin'
@@ -86,14 +96,18 @@ secret_data = data_handler.SecreteData()
 __version__ += " " * (bool(__test_version__)) + __test_version__  # Adds <space> and version if __test_version__ present
 
 GPS = gps.GPS()
-geocoding_client = GeocoderClient()
+geocoding_client = GeocoderClient(ssl_context=context)
+# ssl context on geopy won't be able to access the internet on android app, so changing it with custom ssl-context
+
+is_first_login = False
 
 
 # Kivy doesn't allow changing screen from outer thread other than kivy's (tested on windows)
 # This function uses kivy's Clock to change screen
 def change_screen_to(screen: str) -> None:
     global current_screen, previous_screen
-    previous_screen = current_screen
+    if current_screen != screen:
+        previous_screen = current_screen
     current_screen = screen
     Clock.schedule_once(_set_screen, 0.0)
 
@@ -108,7 +122,7 @@ last_esc_down = 0
 
 
 # Response every keystroke including esc button
-def hook_keyboard(_, key, *__) -> None | bool:
+def keyboard_listener(_, key, *__) -> None | bool:
     global last_esc_down
     if key == Constants.ESCAPE_CODE:  # Esc button on Windows and back button on Android
         if sm.current in ('settings', 'saved_locations'):
@@ -308,6 +322,36 @@ def dialog_type_1(title: str, msg: str, buttons: list[Button], auto_dismiss_on_b
     return dialog  # if you want to dismiss manually
 
 
+def text_input_dialog(title: str,
+                      buttons: list[Button] = None,
+                      filler_text: str = '',
+                      hint_text: str = '',
+                      dismissible: bool = False,
+                      auto_dismiss_on_button_press: bool = True,
+                      on_dismiss_callback: Callable = None,
+                      extra_callbacks: dict[str, Callable] = None,
+                      __force_un_dismissible: bool = False):
+    if buttons is None:
+        buttons = []
+    dialog = MDDialog(title=title,
+                      buttons=buttons,
+                      type='custom',
+                      content_cls=TextInputDialogContent(text=filler_text,
+                                                         hint_text=hint_text))
+    dialog.auto_dismiss = dismissible if buttons else True
+    if __force_un_dismissible and not dismissible:
+        dialog.auto_dismiss = False
+    if auto_dismiss_on_button_press:
+        for button in buttons:
+            button.bind(on_release=dialog.dismiss)
+    dialog.open()
+    if on_dismiss_callback is not None:
+        dialog.bind(on_dismiss=on_dismiss_callback)
+    if extra_callbacks is not None:
+        dialog.bind(**extra_callbacks)
+    return dialog
+
+
 __log_to_send: str = ''
 
 
@@ -341,6 +385,13 @@ def common_pass_check(password: str):
     :return: bool
     """
     return True if 4 <= len(password) <= 16 else False
+
+
+class TextInputDialogContent(MDBoxLayout):
+    def __init__(self, *args, hint_text, text, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ids['text_field'].hint_text = hint_text
+        self.ids['text_field'].text = text
 
 
 class UserData:
@@ -636,11 +687,14 @@ class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
 class AlarmExpansionContent(MDBoxLayout):
     # Content for expansion panel
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, full_address, **kwargs):
+        print('Content init')
         super().__init__(args, kwargs)
         self.drop_down_menu = None
         self.weeks = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
         self.refresh_week_buttons()
+        # self.full_address = full_address
+        self.ids['full_address'].text = full_address
 
     def refresh_week_buttons(self):
         # on android, initially all buttons were texted as 's' by default;
@@ -663,8 +717,31 @@ class AlarmExpansionPanel(MDExpansionPanel):
         # self.chevron.icon_color = self.chevron.disabled_color
         self.chevron.bind(on_release=lambda x=None: self.toggle_panel(x))
 
+    def update_height(self):
+        self.height = self.content.height + self.panel_cls.height
+        # print(self.content.height)
+
     def toggle_panel(self, _=None):
         self.check_open_panel(self.panel_cls)
+
+    def open_panel(self, *args) -> None:
+        """Method opens a panel."""
+        if self._anim_playing:
+            return
+
+        self._anim_playing = True
+        self._state = "open"
+
+        # print('\n'.join(dir(self.content.ids['full_address'])))
+
+        anim = Animation(
+            height=self.content.height + self.height,
+            d=self.opening_time,
+            t=self.opening_transition,
+        )
+        anim.bind(on_complete=self._add_content)
+        anim.bind(on_complete=self._disable_anim)
+        anim.start(self)
 
     def on_open(self, *args):
         # for child in self.parent.children:  # on_close won't be called if we open another panel without closing opened
@@ -686,7 +763,6 @@ class AlarmExpansionPanel(MDExpansionPanel):
             instance_panel: [
                 MDExpansionPanelThreeLine,
                 MDExpansionPanelTwoLine,
-                MDExpansionPanelThreeLine,
                 MDExpansionPanelLabel,
             ],
     ) -> None:
@@ -742,11 +818,20 @@ class AlarmExpansionPanel(MDExpansionPanel):
     def _remove(self, *_):
         self._reset_scroll()
         self.parent.remove_widget(self)  # goodbye
+        del self
 
 
 class PasswordInputScreen(MDScreen):
     def on_enter(self, *args):
         pass
+
+    @staticmethod
+    def open_info_dialog():
+        button = MDRaisedButton(text='ok')
+        dialog_type_1(title='Password protection',
+                      msg='In order to protect your privacy, and store your data securely we use password protected '
+                          'encryption, so you need create a new password',
+                      buttons=[button])
 
     @staticmethod
     def key_stroke(_from, _to, text):
@@ -810,6 +895,13 @@ class PasswordInputScreen(MDScreen):
 
 
 class PasswordLoginScreen(MDScreen):
+    def on_enter(self, *args):
+        if is_first_login:
+            # defaulted to false
+            # if not first time login then user is opted not to store the password
+            # else we offer to save the password
+            self.ids['check_box'].active = True
+
     def enter_button(self):
         password = self.ids['password'].text
         if not self.is_pass_valid():
@@ -871,7 +963,7 @@ class AlarmsTab(MDScreen):
 
     def add_active_alarms(self):
         item = AlarmExpansionPanel(
-            content=AlarmExpansionContent(),
+            content=AlarmExpansionContent(full_address='Full address will appear here ' * 30),
             panel_cls=CustomExpansionPanelThreeLineListItem(
                 text='Bengaluru',
                 secondary_text='25km',
@@ -1110,10 +1202,34 @@ class AddNewLocationScreen(MDScreen):
         co_ords_text = self.ids['cords_in'].text.strip()
         if location_text == '' or co_ords_text != '':
             self.ids['get_button'].is_reverse = True
-            self.ids['get_button'].text = 'Get name'
+            self.ids['get_button'].text = 'Get address'
         else:
             self.ids['get_button'].is_reverse = False
             self.ids['get_button'].text = 'Get co-ordinates'
+
+    @staticmethod
+    def format_short_name(text: str) -> str:
+        if ',' in text:
+            text = text.split(',')[0]
+        else:
+            text = text.split()[0]
+        if len(text) > 15:
+            text = text[:15]
+        return text
+
+    def open_short_address_dialog(self):
+        cancel = MDFlatButton(text='Cancel')
+        add = MDRaisedButton(text='Add')
+        txt: str = self.ids['location_name'].text
+        if not txt.strip():
+            self.ids['location_name'].helper_text = 'This field is required'
+            self.ids['location_name'].error = True
+            return
+        txt = self.format_short_name(txt)
+        text_input_dialog(title='Add short name',
+                          hint_text='Short name',
+                          filler_text=txt,
+                          buttons=[cancel, add])
 
 
 class MyScreenManager:
@@ -1157,7 +1273,7 @@ class MyScreenManager:
             self.get_screen(target_screen)
             self.screen_manager.current = target_screen
 
-    def get_screen(self, screen_name: str) -> Screen:
+    def get_screen(self, screen_name: str) -> Screen | NoReturn:
         """
         Returns the requested screen
         :param screen_name: Required screen name
@@ -1185,7 +1301,8 @@ class MyScreenManager:
         Adds screen name and class to future rendering items
         :param screen_name: Name of screen (this name is used to represent the object)
         :param cls: Class
-        :param _overwrite: If set True and screen_name exists, overwrites the previous Class of the same
+        :param _overwrite: If set True and screen_name exists,
+        overwrites the previous Class of the same or else error will be raised.
         :return: None
         :raise KeyError: When screen-name already exists
         """
@@ -1307,15 +1424,16 @@ class MainApp(MDApp):
         """
         global last_esc_down
         last_esc_down = 0  # making sure that this isn't combine with real back/escape button
-        hook_keyboard(None, Constants.ESCAPE_CODE)
+        keyboard_listener(None, Constants.ESCAPE_CODE)
 
     def on_start(self):
-        global __log_to_send
-        WindowBase.softinput_mode = 'below_target'
+        global __log_to_send, is_first_login
+        WindowBase.softinput_mode = 'below_target'  # noqa
         WindowBase.on_maximize = lambda x=None: print(x, 'maximised')
         WindowBase.on_restore = lambda x=None: print(x, 'window restore')
-        is_first_login = False
-        if GPS.configure(raise_error=False) and False:
+        # WindowBase.on_resize = lambda x=None: print(x, 'Window resize')
+        # is_first_login = False
+        if GPS.configure(raise_error=False):
             button = MDFillRoundFlatButton(text='Close app')
             button.bind(on_release=lambda *_: sys.exit())
             dialog_type_1('Oh no!',
@@ -1348,6 +1466,13 @@ class MainApp(MDApp):
 
             class FirstInfoScreen(MDScreen):
                 @staticmethod
+                def hyper_link_press(link):
+                    try:
+                        app.open_url(link[1])
+                    except IndexError:
+                        pass
+
+                @staticmethod
                 def agree():
                     change_screen_to('loading')
                     os.mkdir('Error log')
@@ -1360,6 +1485,8 @@ class MainApp(MDApp):
                         dialog_type_1(title='Data Recovery',
                                       msg='Old data was found in this device, do you want to recover?',
                                       buttons=[no, yes])
+                    else:
+                        change_screen_to('signin')
 
             screens.add_screen('first_info', FirstInfoScreen)
             # sm.add_widget(first_info)
@@ -1370,7 +1497,7 @@ class MainApp(MDApp):
             user_data.decode_and_decide_screen()
 
         # app.theme_cls.bg
-        EventLoop.window.bind(on_keyboard=hook_keyboard)
+        EventLoop.window.bind(on_keyboard=keyboard_listener)
 
     def build(self):
         self.theme_cls.material_style = 'M3'

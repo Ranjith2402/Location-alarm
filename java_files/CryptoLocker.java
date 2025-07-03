@@ -1,6 +1,7 @@
 package ranji.dev.location;  // must match with the package name
 
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
 import javax.security.auth.DestroyFailedException;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -12,12 +13,17 @@ import java.util.Base64;
 
 public class CryptoLocker{
     public static final String CRYPTOGRAPHIC_ALGORITHM = "AES";
-    private final String password = "KpGCIBkSQnNezARLjh7zVpcEElzL0M5Z4";  // this is just random characters
+    public static final String ENCRYPTION_MODE = "CBC";
+    public static final String PADDING = "PKCS5Padding";
+    public final String KEYSTORE_PROVIDER = "AndroidKeyStore";
     private final String KEY_STORE_FILE_NAME = "newKeyStoreFileName.jks";
-    private final String SECRET_KEY_ALIAS = "MY_KEY";
+
+    public static final String CIPHER_INSTANCE_ARG = CRYPTOGRAPHIC_ALGORITHM + "/" + ENCRYPTION_MODE + "/" + PADDING;
+    public byte[] iv = {54, 119, 17, 85, 119, 26, 34, 74, 54, 46, 94, 73, 113, 54, 100, 19};  // random numbers
+    IvParameterSpec iv_spec = new IvParameterSpec(iv);
 
 
-    private void storeKey(SecretKey key, String KEY_ALIAS) throws KeyStoreException, CertificateException, IOException, NoSuchAlgorithmException {
+    private void storeKey(SecretKey key, String KEY_ALIAS, String password) throws KeyStoreException, CertificateException, IOException, NoSuchAlgorithmException {
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         char[] pwdArray = password.toCharArray();
         keyStore.load(null, pwdArray);
@@ -32,7 +38,7 @@ public class CryptoLocker{
         }
     }
 
-    private SecretKey getStoredKey(String KEY_ALIAS) throws KeyStoreException, UnrecoverableEntryException, NoSuchAlgorithmException, CertificateException, IOException {
+    private SecretKey getStoredKey(String KEY_ALIAS, String password) throws KeyStoreException, UnrecoverableEntryException, NoSuchAlgorithmException, CertificateException, IOException {
         char[] pwdArray = password.toCharArray();
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(pwdArray);
@@ -40,7 +46,7 @@ public class CryptoLocker{
         try (FileInputStream fis = new FileInputStream(KEY_STORE_FILE_NAME)) {
             keyStore.load(fis, pwdArray);
         } catch (FileNotFoundException e) {
-            throw new KeyStoreException("Specified file not found \""+ KEY_STORE_FILE_NAME +"\"");
+            throw new KeyStoreException("Specified file not found \"{KEY_STORE_FILE_NAME}\"");
         }
 
         // get my private key
@@ -58,62 +64,52 @@ public class CryptoLocker{
         key.destroy();
     }
 
-    public SecretKey getKey(String KEY_ALIAS) throws NoSuchAlgorithmException, CertificateException, KeyStoreException, IOException {
+    public SecretKey getKey(String KEY_ALIAS, String password) throws NoSuchAlgorithmException, CertificateException, KeyStoreException, IOException {
         SecretKey key;
         try {
-            key = getStoredKey(KEY_ALIAS);
+            key = getStoredKey(KEY_ALIAS, password);
             System.out.println("Old key retrieved successfully");
         } catch (KeyStoreException | UnrecoverableEntryException | NoSuchAlgorithmException e) {
 //            throw new RuntimeException(e);
             key = generateNewKey();
-            storeKey(key, KEY_ALIAS);
+            storeKey(key, KEY_ALIAS, password);
             System.out.println("New key is generated");
         }
         return key;
     }
 
-    public SecretKey getKey() throws CertificateException, NoSuchAlgorithmException, KeyStoreException, IOException {
-        return getKey(SECRET_KEY_ALIAS);
-    }
-
-
-    public SecretKey getKey(boolean createNewKey, String KEY_ALIAS) throws NoSuchAlgorithmException, CertificateException, KeyStoreException, IOException {
-        if (createNewKey) {
-            SecretKey key = generateNewKey();
-            storeKey(key, KEY_ALIAS);
-            return key;
+    public SecretKey getKey(String KEY_ALIAS, String password, Boolean generateNewKey) throws CertificateException, KeyStoreException, IOException, NoSuchAlgorithmException {
+        SecretKey key;
+        if (generateNewKey) {
+            key = generateNewKey();
+            storeKey(key, KEY_ALIAS, password);
+            System.out.println("New key is generated with the same key_alias");
         }
         else {
-            return getKey();
+            key = getKey(KEY_ALIAS, password);
         }
-    }
-    public SecretKey getKey(boolean createNewKey) throws NoSuchAlgorithmException, CertificateException, KeyStoreException, IOException {
-        return getKey(createNewKey, SECRET_KEY_ALIAS);
+        return key;
     }
 
-
-    public String encryptText(String text, SecretKey key) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-        Cipher cipher = Cipher.getInstance(CRYPTOGRAPHIC_ALGORITHM);
-        cipher.init(Cipher.ENCRYPT_MODE, key);
+    public String encryptText(String text, SecretKey key) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+        Cipher cipher = Cipher.getInstance(CIPHER_INSTANCE_ARG);
+//        System.out.println("iv while encryption -> " + iv_spec.hashCode());
+        cipher.init(Cipher.ENCRYPT_MODE, key, iv_spec);
         byte[] cipherText = cipher.doFinal(text.getBytes());
         return Base64.getEncoder().encodeToString(cipherText);
     }
 
-    public String encryptText(String text) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-        SecretKey key = generateNewKey();
-        return encryptText(text, key);
-    }
+    public String decryptText(String cipherText, SecretKey key) throws NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException {
 
-    public String decryptText(String cipherText, SecretKey key) throws NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeyException {
-
-        Cipher cipher = Cipher.getInstance(CRYPTOGRAPHIC_ALGORITHM);
-        cipher.init(Cipher.DECRYPT_MODE, key);
+        Cipher cipher = Cipher.getInstance(CIPHER_INSTANCE_ARG);
+//        System.out.println("iv while decryption -> " + iv_spec.hashCode());
+        cipher.init(Cipher.DECRYPT_MODE, key, iv_spec);
         byte[] plainText = cipher.doFinal(Base64.getDecoder().decode(cipherText));
         return new String(plainText);
     }
 
-    public String decryptText(String cipherText) throws NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeyException, CertificateException, KeyStoreException, IOException {
-        SecretKey key = getKey();
+    public String decryptText(String cipherText, String keyAlias, String password) throws NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeyException, CertificateException, KeyStoreException, IOException, InvalidAlgorithmParameterException {
+        SecretKey key = getKey(keyAlias, password);
         return decryptText(cipherText, key);
     }
 
@@ -121,14 +117,14 @@ public class CryptoLocker{
     // TIP IMPORTANT:
     // Below 2 functions works properly so "DO NOT TOUCH IT"
     public static String encrypt(String input, SecretKey key) throws NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, InvalidKeyException {
-        Cipher cipher = Cipher.getInstance(CRYPTOGRAPHIC_ALGORITHM);
+        Cipher cipher = Cipher.getInstance(CIPHER_INSTANCE_ARG);
         cipher.init(Cipher.ENCRYPT_MODE, key);
         byte[] cipherText = cipher.doFinal(input.getBytes());
         return Base64.getEncoder().encodeToString(cipherText);
     }
     public static String decrypt(String cipherText, SecretKey key) throws NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeyException {
 
-        Cipher cipher = Cipher.getInstance(CRYPTOGRAPHIC_ALGORITHM);
+        Cipher cipher = Cipher.getInstance(CIPHER_INSTANCE_ARG);
         cipher.init(Cipher.DECRYPT_MODE, key);
         byte[] plainText = cipher.doFinal(Base64.getDecoder().decode(cipherText));
         return new String(plainText);

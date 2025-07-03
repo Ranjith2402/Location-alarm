@@ -7,18 +7,18 @@ from custom_errors import SaveFailedException, MissingFileError
 from jnius_helper import autoclass, JniusJavaException, String
 from tools import Constants
 
-KeyStore = autoclass('java.security.KeyStore')
-KeyGenerator = autoclass('javax.crypto.KeyGenerator')
-Cipher = autoclass('javax.crypto.Cipher')
-Base64 = autoclass('android.util.Base64')
-KeyGenParameterSpec = autoclass('android.security.keystore.KeyGenParameterSpec')
-KeyProperties = autoclass('android.security.keystore.KeyProperties')
+# KeyStore = autoclass('java.security.KeyStore')
+# KeyGenerator = autoclass('javax.crypto.KeyGenerator')
+# Cipher = autoclass('javax.crypto.Cipher')
+# Base64 = autoclass('android.util.Base64')
+# KeyGenParameterSpec = autoclass('android.security.keystore.KeyGenParameterSpec')
+# KeyProperties = autoclass('android.security.keystore.KeyProperties')
+#
+# DATA_ENCODING_ALGORITHM: str = "AES"
+# KEYSTORE_PROVIDER: str = "AndroidKeyStore"
+# KEY_ALIAS: str = "my_key"
 
-DATA_ENCODING_ALGORITHM: str = "AES"
-KEYSTORE_PROVIDER: str = "AndroidKeyStore"
-KEY_ALIAS: str = "my_key"
-
-CryptoLockerJava = autoclass('ranji.dev.CryptoLocker')
+CryptoLockerJava = autoclass('ranji.dev.location.CryptoLocker')  # DO NOT CHANGE it's correct
 
 
 def sha256_encrypt(text: str, encode_mode: str = 'utf-8') -> str:
@@ -154,6 +154,10 @@ class CryptoLocker:
             password += random.choice(chars)
 
         return password
+
+    @staticmethod
+    def generate_random_iv() -> list[int]:
+        return [random.randint(1, 127) for _ in range(16)]
 
     def encrypt_text(self, text: str, password: str) -> str:
         self.__get_key(password)

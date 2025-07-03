@@ -98,6 +98,24 @@
 
 
 
+
+<MyLabel@MDLabel>:
+    size_hint_y: None
+    height: self.texture_size[1]
+    halign: 'justify'
+
+
+
+<TextInputDialogContent>:
+    orientation: 'vertical'
+    spacing: '12dp'
+    size_hint_y: None
+    MDTextField:
+        hint_text: 'Short name'
+        id: text_field
+
+
+
 <CustomExpansionPanelThreeLineListItem>:
     bg_color: 0.2, 0.2, 0.2, 0.6
     radius: dp(15)
@@ -253,6 +271,11 @@
     id: main_parent
     adaptive_height: True
     padding: 15
+    # on_parent:
+    #     if self.parent is not None: self.parent.update_height()
+    on_height:
+        if self.parent is not None: self.parent.update_height()
+
     canvas.before:
         Color:
             rgba: 0.2, 0.2, 0.2, 0.6
@@ -266,10 +289,19 @@
         #     points: (self.x, self.top), (self.right, self.top)
     BoxLayout:
         size_hint_y: None
+        size_hint_x: None
+        width: self.parent.width
         padding: dp(25)
         spacing: dp(25)
         height: self.minimum_height
         orientation: 'vertical'
+        MyLabel:
+            padding: 0, 0, dp(20), dp(25)
+            id: full_address
+            size_hint: 1, None
+            default_width: root.width
+            text: ''
+            height: self.height
         BoxLayout:
             size_hint_y: None
             height: self.minimum_height
@@ -383,19 +415,15 @@
                         MyLabel:
                             id: co_ords
                             text: 'Getting co-ordinates...'
-                            halign: 'left'
                         MyLabel:
                             id: location
                             text: 'Getting location...'
-                            halign: 'left'
                         MyLabel:
                             id: speed
                             text: 'Getting speed...'
-                            halign: 'left'
                         MyLabel:
                             id: heading
                             text: 'Getting heading...'
-                            halign: 'left'
             TooltipMDIconButton:
                 tooltip_text: 'Copy'
                 icon: 'content-copy'
@@ -480,11 +508,11 @@
         pos_hint: {'right': 0.95, 'y': dp(100) / root.height}
         on_release: root.add_content()
 
-        _soft_shadow_size: self.soft_shadow_size
-        _soft_shadow_pos: self.soft_shadow_pos
-        _hard_shadow_texture: self.hard_shadow_texture
-        _hard_shadow_size: self.hard_shadow_size
-        _hard_shadow_pos: self.hard_shadow_pos
+        # _soft_shadow_size: self.soft_shadow_size
+        # _soft_shadow_pos: self.soft_shadow_pos
+        # _hard_shadow_texture: self.hard_shadow_texture
+        # _hard_shadow_size: self.hard_shadow_size
+        # _hard_shadow_pos: self.hard_shadow_pos
 
     ToolBar:
         id: top_app_bar
@@ -582,14 +610,14 @@
                     padding: 0, 0, 0, dp(32)
                     MDTextField:
                         id: location_name
-                        hint_text: 'Location name'
+                        hint_text: 'Full address'
                         # on_focus: root.reset_text_field_error_stat()
                         on_text: root.location_input()
                         helper_text_mode: 'on_error'
                     LagRectangleFlatButton:
                         id: get_button
                         pos_hint: {'center_y':0.5}
-                        text: 'Get name'
+                        text: 'Get address'
                         is_reverse: True
                         lag_function: root.get_location_info
                 EssentialContent:
@@ -606,14 +634,9 @@
                     text: 'Add'
                     icon: 'plus'
                     pos_hint: {'center_x': 0.5}
-                    on_release: app.toast(fun=True, id_='8')
+                    on_release: root.open_short_address_dialog()
 
 
-
-<MyLabel@MDLabel>:
-    size_hint_y: None
-    height: self.texture_size[1]
-    halign: 'center'
 
 <FirstInfoScreen>:
     MDScreen:
@@ -622,48 +645,114 @@
                 size_hint_y: None
                 height: self.minimum_height
                 orientation: 'vertical'
-                padding: 25
+                padding: dp(32)
                 MyLabel:
-                    text: 'DISCLAIMER'
+                    text: 'Terms and Conditions'
                     font_style: 'H4'
+                    halign: 'center'
                 MyLabel:
-                    text: '\nLast updated March 2, 2024\n'
-                # MyLabel:
-                #     text: "Read this carefully"
-                MyLabel:
-                    text: '•Before starting:'
-                    font_style: 'H5'
-                    halign: 'left'
-                MyLabel:
-                    pos_hint: {'center_x': 0.55}
-                    size_hint_x: 0.92
-                    halign: 'left'
-                    text: "\n      This app is still under development, you may experience frequent crashes, glitches or bugs. Don't worry!, with your feedback these can be fixed, So please consider giving feedback.\n\n"
-                    # text: '\n      The information provided by YoutubeVideoDownloader ("we," "us," or "our") on our mobile application is for general informational purposes. All information on our mobile application is provided in good faith, however we make no representation or warranty of any kind, express or implied, regarding the accuracy, adequacy, validity, reliability, availability, or completeness of any information on our mobile application. UNDER NO CIRCUMSTANCE SHALL WE HAVE ANY LIABILITY TO YOU FOR ANY LOSS OR DAMAGE OF ANY KIND INCURRED AS A RESULT OF THE USE OF OUR MOBILE APPLICATION OR RELIANCE ON ANY INFORMATION PROVIDED ON OUR MOBILE APPLICATION. YOUR USE OF OUR MOBILE APPLICATION AND YOUR RELIANCE ON ANY INFORMATION ON OUR MOBILE APPLICATION IS SOLELY AT YOUR OWN RISK.\n\n'
-                MyLabel:
-                    text: '•Your Data:'
-                    font_style: 'H5'
-                    halign: 'left'
-                MyLabel:
-                    pos_hint: {'center_x': 0.55}
-                    size_hint_x: 0.92
-                    halign: 'left'
-                    text: "\n      We respect your privacy, our app DO NOT collect, store* or process any kind of information except the feedback provided by you. Your feedback is kept only between us and you (end user), we do not share your information with any third parties. IN-CASE OF LOSS OR DAMAGE OF YOU INFO UNDER ANY CIRCUMSTANCE IS ASSUMED SOLELY BY YOURS\n\n\n      *Storing doesn't include \"Error log\", this file is created when the app is about to crash. This file contains useful information about error.\n\nWhich includes\n  1.  Time error happened\n  2. Your device architecture and\n  3. Actual error info\n\n     We use these information to re-create bug and try to eliminate it\n\n"
-                    # text: '\n      Our mobile application may contain (or you may be sent through our mobile application) links to other websites or content belonging to or originating from third parties (i.e; Youtube). Such external links are not investigated, monitored, or checked for accuracy, adequacy, validity, reliability, availability, or completeness by us. WE DO NOT WARRANT, ENDORSE, GUARANTEE, OR ASSUME RESPONSIBILITY FOR THE ACCURACY OR RELIABILITY OF ANY INFORMATION OFFERED BY THIRD-PARTY WEBSITES (here Youtube only) LINKED THROUGH THE SITE. WE WILL NOT BE A PARTY TO OR IN ANY WAY BE RESPONSIBLE FOR MONITORING ANY TRANSACTION BETWEEN YOU AND YOUTUBE PROVIDERS OF PRODUCTS OR SERVICES.\n\n'
-                MyLabel:
-                    text: '•Message from developer:'
-                    font_style: 'H5'
-                    halign: 'left'
-                MyLabel:
-                    pos_hint: {'center_x': 0.55}
-                    size_hint_x: 0.92
-                    halign: 'left'
-                    text: "\n      Thank you for installing this app. Remember you are \'alpha\' tester for this app, currently NOTHING works at all, you have to look at UI/UX (User Interface -> how ease it is to us this app and how it visually appealing look wise) and give feedback is there any changes needed or any new additions/features required,  Your opinion matters, I love to hear your feedback. See you in the feedback section, Happy hunting bugs ;)\n\n"
-                    # text: '\n      Downloading the copyrighted video/audio is illegal we were not responsible for your downloads!. Download at your risk\n'
-                # MyLabel:
-                #     halign: 'left'
-                #     font_style: 'Caption'
-                #     text: '*By pressing Continue you agreeing to the above conditions\n'
+                    halign: 'center'
+                    text: 'Last updated February 22, 2024\n\n'
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: dp(32)
+                    MyLabel:
+                        text: '• Before starting:'
+                        font_style: 'H5'
+                        halign: 'left'
+                    MyLabel:
+                        pos_hint: {'center_x': 0.55}
+                        size_hint_x: 0.92
+                        markup: True
+                        text: "This app is under development and not a completed product so, you may experience frequent crashes, glitches or bugs. Don't worry!, with your feedback these can be fixed, So please consider giving feedback."
+                    MyLabel:
+                        text: '• Data Usage and OpenStreetMap:'
+                        font_style: 'H5'
+                        halign: 'left'
+                    MyLabel:
+                        pos_hint: {'center_x': 0.55}
+                        size_hint_x: 0.92
+                        markup: True
+                        text: "We respect your privacy, our app (Location alarm) uses the [b]OpenStreetMap (OSM)[/b] service for geocoding and reverse-geocoding.  This means that when you enter [b]GPS coordinates (latitude and longitude)[/b] into the App, those coordinates are sent to OSM to convert them into a human-readable address (reverse-geocoding) or to find coordinates for a given address (geocoding). This is the only data transmitted from the app. We DO NOT collect or store these coordinates or the results of the geocoding/reverse-geocoding process on our servers."
+                    MyLabel:
+                        pos_hint: {'center_x': 0.55}
+                        size_hint_x: 0.92
+                        markup: True
+                        text: "OSM is a third-party service, and its own terms and privacy policy will govern its use of the data you provide. We strongly encourage you to review the OpenStreetMap [ref=https://osmfoundation.org/wiki/Terms_of_Use][u][color=4287f5]Terms of Use[/color][/u][/ref] and [ref=https://osmfoundation.org/wiki/Privacy_Policy][u][color=4287f5]Privacy Policy[/color][/u][/ref]. We are not responsible for the data practices of OpenStreetMap beyond the transmission of the coordinates you enter for the purpose of using the OSM geocoding/reverse-geocoding service."
+                        on_ref_press:
+                            root.hyper_link_press(args)
+                    MyLabel:
+                        text: '• About service provider (OSM):'
+                        font_style: 'H6'
+                        size_hint_x: 0.92
+                        halign: 'left'
+                        pos_hint: {'center_x': 0.55}
+                    MyLabel:
+                        size_hint_x: 0.8
+                        pos_hint: {'center_x': 0.58}
+                        markup: True
+                        text: "OpenStreetMap is a free, editable map of the whole world that is being built by volunteers largely from scratch and released with an open-content license.\n[ref=https://www.openstreetmap.org/copyright][u][color=4287f5]The OpenStreetMap License[/color][/u][/ref] allows free (or almost free) access to OSM\'s map images and all of OSM\'s underlying map data. The project aims to promote new and interesting uses of the data. For more details about \"why we use OpenStreetMap (OSM)\" and why not google, click [ref=https://wiki.openstreetmap.org/wiki/FAQ#Why_OpenStreetMap?][color=4287f5][u]here[/u][/color]. If want to know more about our service provider which is OpenStreetMap (OSM) click [ref=https://wiki.openstreetmap.org/wiki/About_OpenStreetMap][color=4287f5][u]here[/u][/color]"
+                        on_ref_press:
+                            root.hyper_link_press(args)
+                    MyLabel:
+                        text: '• Other data usage'
+                        font_style: 'H6'
+                        size_hint_x: 0.92
+                        halign: 'left'
+                        pos_hint: {'center_x': 0.55}
+                    MyLabel:
+                        size_hint_x: 0.8
+                        pos_hint: {'center_x': 0.58}
+                        markup: True
+                        text: "Beyond the transmission of user-entered GPS coordinates to OSM for geocoding/reverse-geocoding as described in above section, Location Alarm does not collect any other personal data from you. We do not track your location outside of the coordinates you explicitly provide for geocoding/reverse-geocoding, your usage patterns within the app, or any other information that could be used to identify you."
+                    MyLabel:
+                        text: '• Permitted Use:'
+                        font_style: 'H5'
+                        halign: 'left'
+                    MyLabel:
+                        pos_hint: {'center_x': 0.55}
+                        size_hint_x: 0.92
+                        text: "You may use the App solely for its intended purpose, You agree not to use the App for any unlawful or prohibited purpose."
+                    MyLabel:
+                        text: '• Disclaimer of Warranties:'
+                        font_style: 'H5'
+                        halign: 'left'
+                    MyLabel:
+                        pos_hint: {'center_x': 0.55}
+                        size_hint_x: 0.92
+                        text: "The App is provided \"as is\" and \"as available\" without any warranties of any kind, either express or implied. We do not warrant that the App will be error-free, uninterrupted, or that any defects will be corrected. We disclaim all warranties of merchantability, fitness for a particular purpose, and non-infringement. Specifically, we make no warranties regarding the accuracy, completeness, or reliability of the geocoding/reverse-geocoding results provided by OpenStreetMap."
+
+                    MyLabel:
+                        text: '• Limitation of Liability:'
+                        font_style: 'H5'
+                        halign: 'left'
+                    MyLabel:
+                        pos_hint: {'center_x': 0.55}
+                        size_hint_x: 0.92
+                        text: "To the maximum extent permitted by applicable law, we shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, arising out of your access to or use of the App, even if we have been advised of the possibility of such damages."
+                    MyLabel:
+                        text: '• Message from developer:'
+                        font_style: 'H5'
+                        halign: 'left'
+                    MyLabel:
+                        pos_hint: {'center_x': 0.55}
+                        size_hint_x: 0.92
+                        text: "Thank you for installing this app. Remember you are \'alpha\' tester for this app, currently NOTHING works at all, you have to look at UI/UX (User Interface -> how ease it is to us this app and how it visually appealing look wise) and give feedback is there any changes needed or any new additions/features required,  Your opinion matters, I love to hear your feedback. See you in the feedback section, Happy hunting bugs ;)"
+                        # text: '\n      Downloading the copyrighted video/audio is illegal we were not responsible for your downloads!. Download at your risk\n'
+                    MyLabel:
+                        text: '• Note:'
+                        font_style: 'H5'
+                        halign: 'left'
+                    MyLabel:
+                        pos_hint: {'center_x': 0.55}
+                        size_hint_x: 0.92
+                        text: "By using the App, you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions."
+                    MyLabel:
+                        font_style: 'Caption'
+                        text: '*By pressing Continue you agreeing to the above conditions'
+                        halign: 'center'
 
 
                 MDRaisedButton:
@@ -697,6 +786,7 @@
         text: 'Enter new password'
         font_size: dp(32)
         pos_hint: {'top': 0.9}
+        halign: 'center'
 
     MDTextField:
         id: password
@@ -720,6 +810,7 @@
         pos: password.right - self.width + dp(8), 0
         theme_text_color: 'Custom'
         icon_color: password.line_color_normal
+        on_release: root.open_info_dialog()
 
     MDTextField:
         id: confirm_password
@@ -758,9 +849,10 @@
             size: dp(24), dp(24)
             pos_hint: {'center_x': 0.5}
 
-        MDLabel:
+        MDTextButton:
             text: 'Remember me'
-            halign: 'left'
+            on_release:
+                check_box.active = not check_box.active
 
     MDFillRoundFlatIconButton:
         id: proceed
@@ -792,6 +884,7 @@
         text: 'Enter your password'
         font_size: dp(32)
         pos_hint: {'top': 0.9}
+        halign: 'center'
 
     MDTextField:
         id: password
@@ -811,15 +904,18 @@
         height: self.minimum_height
         pos_hint: {'x': password.x / root.width, 'top': (password.y - dp(20)) / root.height}
         MDCheckbox:
-            active: True
+            id: check_box
+            active: False
             inactive_color: app.theme_cls.primary_color
             size_hint: None, None
             size: dp(24), dp(24)
             pos_hint: {'center_x': 0.5}
 
-        MDLabel:
+        MDTextButton:
             text: 'Remember me'
             halign: 'left'
+            on_release:
+                check_box.active = not check_box.active
 
     MDFillRoundFlatIconButton:
         id: proceed
