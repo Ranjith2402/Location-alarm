@@ -1,8 +1,11 @@
 """
 In this file we handel mobile GPS
 """
-
+# todo delete unused modules
+import random
+import time
 from collections.abc import Callable
+from threading import Thread
 
 import plyer
 from custom_errors import GPSNotImplementedError
@@ -17,10 +20,12 @@ class GPS:
         self.status_change_callback: list[Callable] = []
         self.location_change_callback: list[Callable] = []
 
-        self.location = None
+        self.location: dict = None
         self.stype = None
         self.status = None
         self.is_configured = False
+
+        self.is_active = False
 
         # self.location_manager = mActivity.getSystemService(content_Context.LOCATION_SERVICE)
         # related to get_last_known_location function
@@ -79,15 +84,36 @@ class GPS:
     def __on_location(self, **kwargs):
         self.location = kwargs.copy()
         for callback in self.location_change_callback:
-            callback(**kwargs)
+            callback(kwargs)
 
-    @staticmethod
-    def start():
+    def start(self):
+        """
+        Starts receiving GPS updates
+        :return:
+        :raises: NotImplementedError
+        """
         plyer.gps.start()
+        self.is_active = True
 
-    @staticmethod
-    def stop():
+    def stop(self):
         plyer.gps.stop()
+        self.is_active = False
+
+    def non_android(self):
+        # todo delete this
+        self.is_active = True
+        p = Thread(target=self.__repeater, daemon=True)
+        p.start()
+
+    def __repeater(self):
+        # todo delete this function
+        while True:
+            time.sleep(5)
+            self.__on_location(lat=random.randint(-90000, 90000)/1000,
+                               lon=random.randint(-180000, 180000)/1000,
+                               heading=random.randint(0, 360000)/1000,
+                               bearing=random.randint(0, 360000)/1000,
+                               speed=random.randint(0, 360000)/1000)
 
     # def get_last_known_location(self) -> tuple[int, int] | None:
     #     location = self.location_manager.getLastKnownLocation(LocationManager.GPS_PROVIDER)

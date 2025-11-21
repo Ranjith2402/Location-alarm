@@ -113,6 +113,8 @@
     MDTextField:
         hint_text: 'Short name'
         id: text_field
+        helper_text: 'This field is required!'
+        helper_text_mode: 'on_error'
 
 
 
@@ -121,6 +123,31 @@
     radius: dp(15)
     font_style: 'H6'
     divider_color: app.theme_cls.bg_normal
+
+
+
+
+<CustomTwoLineAvatarIconListItem>:
+    bg_color: 0.2, 0.2, 0.2, 0.6
+    radius: dp(15)
+    font_style: 'H6'
+    text: root.text
+    secondary_text: root.secondary_text
+    # tertiary_text: root.tertiary_text
+    divider_color: app.theme_cls.bg_normal
+
+    IconLeftWidget:
+        icon: 'plus'
+        on_release: root.on_left_icon_release()
+        # icon: root.left_icon
+        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+
+    IconRightWidget:
+        icon: 'pencil'
+        on_release: root.on_right_icon_release()
+        # icon: root.right_icon
+        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+
 
 
 
@@ -148,7 +175,7 @@
     inactive_color: '#555555'
     active_color: app.theme_cls.primary_color
     size_hint: None, None
-    size: self.parent.width // 7, self.parent.height
+    size: self.parent.width / 7, self.parent.height
 
     theme_icon_color: "Custom"
     icon_color: self.active_color if self.is_active else self.inactive_color
@@ -213,6 +240,8 @@
         MySwitch:
             # size_hint: None, None
             # size: self.size
+            id: sound_checkbox
+            active: True
             icon_active: "check"
             pos_hint: {'y': -0.15}
 
@@ -229,6 +258,8 @@
         MySwitch:
             # size_hint: None, None
             # size: self.size
+            id: vibrate_checkbox
+            active: True
             icon_active: "check"
             pos_hint: {'y': -0.15}
 
@@ -302,18 +333,6 @@
             default_width: root.width
             text: ''
             height: self.height
-        BoxLayout:
-            size_hint_y: None
-            height: self.minimum_height
-            padding: dp(25), -dp(25), dp(25), 0
-            spacing: 50
-            MDLabel:
-                text: 'Active state'
-                halign: 'right'
-            MySwitch:
-                id: is_active
-                icon_active: 'check'
-                pos_hint: {'y': -0.15}
         EssentialContent:
             id: ess_content
         MDRectangleFlatIconButton:
@@ -416,14 +435,22 @@
                             id: co_ords
                             text: 'Getting co-ordinates...'
                         MyLabel:
+                            theme_text_color: 'Custom'
+                            text_color: app.theme_cls.text_color
                             id: location
                             text: 'Getting location...'
                         MyLabel:
                             id: speed
                             text: 'Getting speed...'
                         MyLabel:
+                            id: altitude
+                            text: 'Getting altitude...'
+                        MyLabel:
                             id: heading
                             text: 'Getting heading...'
+                        MyLabel:
+                            id: accuracy
+                            text: 'Getting accuracy...'
             TooltipMDIconButton:
                 tooltip_text: 'Copy'
                 icon: 'content-copy'
@@ -467,6 +494,7 @@
                 on_tab_press:
                     root.tab_press(self)
                     alarm_tab.on__enter()
+                    maps_tab.on__leave()
 
                 AlarmsTab:
                     id: alarm_tab
@@ -478,7 +506,9 @@
                 on_tab_press:
                     root.tab_press(self)
                     alarm_tab.on__leave()
+                    maps_tab.on__enter()
                 GoogleMapsTab:
+                    id: maps_tab
 
             # MDBottomNavigationItem:
             #     name: 'screen 2'
@@ -531,19 +561,43 @@
 <SavedLocationsScreen>:
     MDBoxLayout:
         padding: dp(8)
-        MDScrollView:
-            MDBoxLayout:
-                orientation: 'vertical'
+        orientation: 'vertical'
+        MDBoxLayout:
+            size_hint: 1, None
+            height: self.minimum_height
+            MDIconButton:
+                icon: 'arrow-left'
+                pos_hint: {'top': 1.2}
+                on_press: app.escape_button()
+            MDLabel:
+                size_hint_y: None
+                height: self.texture_size[1]
+                text: 'Saved locations'
+                font_style: 'H5'
+                pos_hint: {'top': 0.98}
+                valign: 'top'
+        MDRecycleView:
+            id: rv
+            key_viewclass: 'viewclass'
+            key_size: 'height'
+            RecycleBoxLayout:
                 size_hint_y: None
                 id: container
                 height: self.minimum_height
-                MDRectangleFlatIconButton:
-                    icon: 'plus'
-                    text: 'Add'
-                    font_size: '32dp'
-                    pos_hint: {'center_x': 0.5}
-                    on_release: app.goto_screen('new_location')
+                padding: dp(10)
+                spacing: dp(25)
+                default_size: None, dp(110)
+                default_size_hint: 1, None
+                orientation: 'vertical'
+        MDRectangleFlatIconButton:
+            icon: 'plus'
+            text: 'Add'
+            font_size: '32dp'
+            pos_hint: {'center_x': 0.5, 'top': rv.x}
+            on_release: app.goto_screen('new_location')
     MDLabel:
+        id: tmp_text
+        padding: '8dp'
         text: 'Saved locations will appear here'
         halign: 'center'
 
@@ -569,12 +623,13 @@
                 pos_hint: {'top': 0.98}
                 valign: 'top'
         ScrollView:
+            id: scroll_container
             MDBoxLayout:
                 orientation: 'vertical'
                 size_hint_y: None
                 height: self.minimum_height
                 spacing: '24dp'
-                padding: '10dp'
+                padding: '15dp'
                 MDBoxLayout:
                     size_hint_y: None
                     height: self.minimum_height
@@ -628,13 +683,24 @@
                     height: self.minimum_height
                     padding: 0, '16dp', 0, '16dp'
                     MDTextButton:
+                        id: sound_file
+                        file_name: None
                         text: 'Song.mp3'
                         on_release: app.toast(fun=True, id_='7')
-                MDRectangleFlatIconButton:
-                    text: 'Add'
-                    icon: 'plus'
-                    pos_hint: {'center_x': 0.5}
-                    on_release: root.open_short_address_dialog()
+                MDBoxLayout:
+                    id: bottom_button
+                    size_hint: None, None
+                    height: self.minimum_height
+                    width: self.minimum_width
+                    pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                    spacing: '16dp'
+                    padding: '8dp'
+
+
+
+
+<SavedItemEditScreen>:
+
 
 
 

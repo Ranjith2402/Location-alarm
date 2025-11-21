@@ -56,7 +56,8 @@ class ErrorHandler:
         except FileNotFoundError:
             pass
 
-    def call__catch_and_crash(self, func: Callable, *args, raise_error: bool = False, **kwargs):
+    def call__catch_and_crash(self, func: Callable, *args, raise_error: bool = False,
+                              on_exit_callback: Callable = None,**kwargs):
         def safe_log_writer(txt: str = None):
             if txt is None:
                 import traceback
@@ -84,6 +85,9 @@ class ErrorHandler:
             safe_log_writer()
             if raise_error:
                 raise
+        finally:
+            if on_exit_callback is not None:
+                on_exit_callback()
 
     def call_wrapper(self, func):
         def wrapper(*args, raise_error, **kwargs):

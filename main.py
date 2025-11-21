@@ -1,4 +1,4 @@
-__version__: str = '2.2.0'
+__version__: str = '2.3.0'
 __test_version__: str = 'alpha'
 
 import os
@@ -11,13 +11,14 @@ import plyer
 import random
 import certifi
 import webbrowser
+from threading import Thread
 from typing import Callable, NoReturn
 from geopy.exc import GeocoderUnavailable
 
 import gps
 import data_handler
 import exceptions_handler
-from tools import Constants
+from tools import Constants, UserDataKeys, UserDataHandler
 from geocoding import GeocoderClient
 from data_handler import password_encrypt
 from jnius_helper import JniusJavaException
@@ -27,13 +28,13 @@ from kivymd.app import MDApp
 from kivymd.toast import toast as _toast
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.list import OneLineListItem
+from kivymd.uix.list import OneLineListItem, TwoLineAvatarIconListItem
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.menu.menu import MDDropdownMenu
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.taptargetview import MDTapTargetView
 from kivymd.uix.transition.transition import MDFadeSlideTransition
-from kivymd.uix.button import MDFlatButton, MDRaisedButton, MDFillRoundFlatButton
+from kivymd.uix.button import MDFlatButton, MDRaisedButton, MDFillRoundFlatButton, MDRectangleFlatIconButton
 from kivymd.uix.expansionpanel.expansionpanel import MDExpansionPanel, MDExpansionPanelThreeLine, \
     MDExpansionPanelTwoLine, MDExpansionPanelLabel
 
@@ -46,7 +47,6 @@ from kivy.lang.builder import Builder
 from kivy.uix.screenmanager import Screen
 from kivy.core.window import WindowBase, EventLoop
 
-
 # usual ritual to access the internet on android
 context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
 
@@ -54,7 +54,6 @@ context.load_verify_locations(certifi.where())  # system CA files
 context.verify_mode = ssl.CERT_REQUIRED
 
 ssl._create_default_https_context = lambda *x: context
-
 
 current_screen = previous_screen = 'signin'
 
@@ -127,7 +126,7 @@ def keyboard_listener(_, key, *__) -> None | bool:
     if key == Constants.ESCAPE_CODE:  # Esc button on Windows and back button on Android
         if sm.current in ('settings', 'saved_locations'):
             change_screen_to('home')
-        elif sm.current in ('new_location',):
+        elif sm.current in ('new_location', 'edit_item'):
             change_screen_to(previous_screen)
         else:
             if time.time() - last_esc_down < 2.5:
@@ -387,6 +386,10 @@ def common_pass_check(password: str):
     return True if 4 <= len(password) <= 16 else False
 
 
+def save_user_data():
+    user_data.save_data_file()
+
+
 class TextInputDialogContent(MDBoxLayout):
     def __init__(self, *args, hint_text, text, **kwargs):
         super().__init__(*args, **kwargs)
@@ -394,7 +397,7 @@ class TextInputDialogContent(MDBoxLayout):
         self.ids['text_field'].text = text
 
 
-class UserData:
+class UserData(UserDataKeys):
     if platform == 'win':
         # FIXME: remove this
         _file_path = './tmp files'
@@ -431,6 +434,19 @@ class UserData:
         #         self._data = None
         # else:
         #     self._data = None
+
+    def __repr__(self):
+        return repr(self.__data)
+
+    def __getitem__(self, item: str) -> UserDataHandler:
+        return UserDataHandler(self.__data[item])
+
+    def __setitem__(self, key: str, value: dict):
+        self.__data[key] = value
+
+    def __delitem__(self, key: str):
+        print(f'deleting -> {key}')
+        del self.__data[key]
 
     def __load_data(self) -> str:
         """
@@ -489,18 +505,37 @@ class UserData:
             else:
                 raise SaveFailedException(f"Unable to save user data: {e.args}")
 
-    @property
-    def password(self):
-        raise TypeError("Cannot get password")
-
-    @password.setter
-    def password(self, value: str):
-        """
-        Only set encrypted password
-        :param value:
-        :return:
-        """
-        self.__password = value
+    def add_new_data(self, *,
+                     full_address: str,
+                     short_name: str,
+                     input_cords: str,
+                     cords: tuple[float],
+                     active_weeks: list[str],
+                     is_sound: bool,
+                     is_vibrate: bool,
+                     radius: int | float,
+                     sound_file: str):
+        data = {self._full_address_key: full_address,
+                # self._short_address_key: short_name, # Note this line disabled
+                self._input_cords_key: input_cords,
+                self._cords_key: cords,
+                self._active_weeks_key: active_weeks,
+                self._is_sound_active_key: is_sound,
+                self._is_vibrate_active_key: is_vibrate,
+                self._radius_key: radius,
+                self._sound_file_key: sound_file}
+        new_short_name = short_name
+        if short_name in user_data.keys:
+            new_short_name = short_name + ' (1)'
+            i = 2  # 2 is correct do not change
+            keys = set(user_data.keys)
+            while new_short_name in keys:  # O(n) linear, no worries (probably)
+                # short_name = short_name.replace(f'({i})', f'({i + 1})')
+                new_short_name = short_name + f' ({i})'
+                i += 1
+        data[self._short_address_key] = new_short_name
+        self[new_short_name] = data  # I never did this
+        self.save_data_file()
 
     def save_password(self):
         secret_data['key-store-password'] = self.__password  # auto save enabled
@@ -529,9 +564,20 @@ class UserData:
             encoded_str: str = self.data_locker.encrypt_text(json_str, self.__password)
             self.__save_data(encoded_str)
         else:
-            self.__save_data(json.dumps({'Somewhere in the universe': [(0.0, 0.0), 50],  # FIXME: remove this
-                                                                                         #      while making app
-                                         'Out there in the cosmos': [(90.0, 90.0), 250]}))
+            # FIXME: remove this
+            #      while making app
+            # self.__save_data(json.dumps({'Somewhere in the universe': {UserDataKeys._cords_key: [12, 34],
+            #                                                            UserDataKeys._full_address_key:
+            #                                                                'This is full name',
+            #                                                            UserDataKeys._short_address_key:
+            #                                                                'Somewhere in the universe'},
+            #                              'Out there in the cosmos': {UserDataKeys._cords_key: [56, 78],
+            #                                                          UserDataKeys._full_address_key:
+            #                                                              'Full name of 2nd thing',
+            #                                                          UserDataKeys._short_address_key:
+            #                                                                'Somewhere in the 2nd universe'}},
+            #                             indent=4))
+            self.__save_data(json.dumps(self.__data, indent=4))
 
     def check_password(self, password: str) -> bool:
         """
@@ -613,6 +659,35 @@ class UserData:
         except (OSError, PermissionError):
             return False
 
+    def get_keys(self) -> list:
+        return list(self.__data.keys())
+
+    @property
+    def password(self):
+        raise TypeError("Cannot get password")
+
+    @password.setter
+    def password(self, value: str):
+        """
+        Only set encrypted password
+        :param value:
+        :return:
+        """
+        self.__password = value
+
+    @property
+    def keys(self):
+        return self.__data.keys()
+
+    @keys.setter
+    def keys(self, value) -> NoReturn:
+        """
+        :param value:
+        :return:
+        :raises: TypeError
+        """
+        raise TypeError("Are sure about that")
+
 
 class WeeksToggleButtons(MDBoxLayout):
     weeks = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
@@ -625,25 +700,45 @@ class WeeksToggleButtons(MDBoxLayout):
         for week in self.weeks:
             self.ids[week].is_active = False
 
+    def get_active(self) -> list[str]:
+        active = []
+        for week in self.weeks:
+            if self.ids[week].is_active:
+                active.append(week)
+        return active
+
+    def set_active(self, active: list[str]):
+        self.reset_buttons()
+        for wk in active:
+            try:
+                self.ids[wk].is_active = True
+            except KeyError:
+                print('Key error')
+
+    def reset_buttons(self):
+        for week in self.weeks:
+            self.ids[week].is_active = False
+
 
 class EssentialContent(MDBoxLayout):
     # Contains common items
     def __init__(self, *args, **kwargs):
         super().__init__(args, **kwargs)
-        self.drop_down_menu = None
+        self.drop_down_menu: MDDropdownMenu | None = None
+        self.menu: dict[str, int] = {'m': 1, 'km': 1000}  # unit: multiplier
+        self.dist_multiplier = 1
 
     def refresh_week_buttons(self):
         self.ids['week_buttons'].refresh_week_buttons()
 
     def open_menu(self):
-        menu = ['m', 'km']
         menu_items = [
             {
                 "text": menu_item,
                 "viewclass": 'CustomDropDownListItem',
                 "height": dp(54),
                 "on_release": lambda x=menu_item: self.set_drop_down_item(x),
-            } for menu_item in menu
+            } for menu_item in self.menu
         ]
 
         self.drop_down_menu = MDDropdownMenu(caller=self.ids['m_km_button'],
@@ -652,12 +747,37 @@ class EssentialContent(MDBoxLayout):
         self.drop_down_menu.open()
 
     def set_drop_down_item(self, opt):
+        self.dist_multiplier = self.menu[opt]
         self.ids['m_km_button'].text = opt
         self.drop_down_menu.dismiss()
 
 
 class CustomDropDownListItem(OneLineListItem):
     ...
+
+
+class CustomTwoLineAvatarIconListItem(TwoLineAvatarIconListItem):
+    # left_icon = StringProperty()
+    # right_icon = StringProperty()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.ids['_text_container'].spacing = dp(16)
+
+    def on_left_icon_release(self):
+        # warning: do not reuse this code
+        self.parent.parent.parent.parent.add_item(self.text)
+
+    def on_left_icon_press(self):
+        pass
+
+    def on_right_icon_release(self):
+        # warning: Do not reuse this code
+        self.parent.parent.parent.parent.edit_item(self.text)
+
+    def on_right_icon_press(self):
+        pass
 
 
 class CustomExpansionPanelThreeLineListItem(MDExpansionPanelThreeLine):
@@ -820,6 +940,9 @@ class AlarmExpansionPanel(MDExpansionPanel):
         self.parent.remove_widget(self)  # goodbye
         del self
 
+    def activate_weeks(self, weeks):
+        self.content.ids['ess_content'].ids["week_buttons"].set_active(weeks)
+
 
 class PasswordInputScreen(MDScreen):
     def on_enter(self, *args):
@@ -961,18 +1084,39 @@ class AlarmsTab(MDScreen):
         elif scroll_dist < 0:
             self.ids['scroll_view'].scroll_y = 0
 
-    def add_active_alarms(self):
+    def add_active_alarms(self,
+                          full_address: str,
+                          text: str,
+                          secondary_text: str = '',
+                          tertiary_text: str = ''):
         item = AlarmExpansionPanel(
-            content=AlarmExpansionContent(full_address='Full address will appear here ' * 30),
+            content=AlarmExpansionContent(full_address=full_address),
             panel_cls=CustomExpansionPanelThreeLineListItem(
-                text='Bengaluru',
-                secondary_text='25km',
-                tertiary_text=', '.join(map(lambda x: x.capitalize(), ['sun', 'mon', 'fri']))
+                text=text,
+                secondary_text=secondary_text,
+                tertiary_text=tertiary_text
             ),
         )
 
         self.expansion_items.append(item)
         self.ids['container'].add_widget(item)
+
+    def add_saved_alarm(self, key: str):
+        full_address = user_data[key].full_address
+        short_name = user_data[key].short_name
+        weeks = user_data[key].active_weeks
+        if weeks == [] or weeks is None:
+            weeks_text = 'No repetition'
+            if weeks is None:
+                weeks = []
+        else:
+            weeks_text = ', '.join(map(lambda x: x.capitalize(), weeks))
+        cords = ', '.join(map(str, user_data[key].cords))
+        self.add_active_alarms(full_address=full_address,
+                               text=short_name,
+                               secondary_text=cords,
+                               tertiary_text=weeks_text)
+        self.expansion_items[-1].activate_weeks(weeks)
 
     def scroll_movement(self, *args):
         # TODO_: change top app bar color as scroll movement
@@ -987,7 +1131,64 @@ class AlarmsTab(MDScreen):
 
 
 class GoogleMapsTab(MDScreen):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.is_callback_bind = False
+        self.last_location_update_time = 0
+
+        self.__location_info_arg: tuple[str, tuple[float | int]] = ('Getting location', app.theme_cls.text_color)
+
+    def on__enter(self):
+        if not GPS.is_active:
+            try:
+                GPS.start()
+            except NotImplementedError:
+                GPS.non_android()
+        if not self.is_callback_bind:
+            self.is_callback_bind = True
+            GPS.register_callback(self.location_receiver, self.status_receiver)
+
+    def on__leave(self):
+        pass
+
+    def location_receiver(self, arg: dict):
+        lat, lon = arg.get('lat'), arg.get('lon')
+        tmp = {'co_ords': f"lat: {lat}, lon: {lon}",
+               'speed': f"{arg.get('speed')} m/s",
+               'heading': f"{arg.get('bearing')}°",
+               'altitude': f"{arg.get('altitude')} m",
+               'accuracy': f"{arg.get('accuracy')} m"}
+        for k, v in tmp.items():
+            self.ids[k].text = v
+        if time.time() - self.last_location_update_time >= 60:
+            self.last_location_update_time = time.time()
+            self.ids['location'].text = 'Getting location'
+            th = Thread(target=self.get_location, args=(lat, lon), daemon=True)
+            th.start()
+
+    def get_location(self, lat: float, lon: float):
+        print('asked for location')
+        try:
+            text, _ = geocoding_client.reverse_geocode(lat, lon)
+            if text is None:
+                self.__location_info_arg = 'Unknown location', (1, 0.8, 0.2, 1)  # yellow color
+                self.last_location_update_time = time.time() - 45
+            else:
+                self.__location_info_arg = text.address, app.theme_cls.text_color
+        except GeocoderUnavailable:
+            self.__location_info_arg = 'No Connection', (1, 0.2, 0.2, 1)  # red color
+            self.last_location_update_time = time.time() - 45  # wait 15s before making another request (60-45 = 15)
+        Clock.schedule_once(self.add_location, 1)
+
+    def add_location(self, _=None):
+        label = self.ids['location']
+        text, color = self.__location_info_arg
+        label.text = text
+        label.text_color = color
+
+    def status_receiver(self):
+        pass
 
 
 class SettingsScreen(MDScreen):
@@ -1043,7 +1244,11 @@ class HomeScreen(MDScreen):
         # self.ids['bottom_navigation'].panel_color = color
 
     def add_content(self):
-        self.ids['alarm_tab'].add_active_alarms()
+        self.ids['alarm_tab'].add_active_alarms(full_address='No 1234, 5th main 6th cross, same place same cords',
+                                                text='Mangalore',
+                                                secondary_text='789m',
+                                                tertiary_text=', '.join(map(lambda x: x.capitalize(),
+                                                                            ['wed', 'thu', 'fri'])))
 
     @staticmethod
     def tab_press(widget):
@@ -1100,6 +1305,104 @@ class SavedLocationsScreen(MDScreen):
     Displays saved locations
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.contents: list = []
+
+        self.first_load: bool = True
+        self.item_to_add: list = []
+        # self.item_changed: list = [] # change items list is no use
+        # since we already appended the 'changed item' to 'added item'
+
+        self.deletion_list: list = []
+
+    def _on_enter(self, *args):  # old method # noqa
+        """
+        Load tested on this screen's view,
+        system: Windows 11, intel i5 11th gen, 8gb ram
+        Minimum FPS hit:
+            No load: 83
+            100 items: 82
+            1000 items: 80
+        and little to no lag, while loading the screen,
+        RecycleView seems to be doing a great work.
+        """
+        # todo: as of 06-11-2025 not tested FPS drop on android, do it ASAP
+        a = set(user_data.get_keys())
+        b = set(self.contents)
+        for item in (a ^ b):
+            if item in b:
+                # item already in the list, but it is in the diff list means it has to be removed
+                try:
+                    ind = self.contents.index(item)
+                    self.ids.rv.data.pop(ind)
+                    # obj = self.ids.rv.children[0].children[ind]
+                    # self.ids.rv.children[0].remove_widget(obj)
+                    self.contents.remove(item)
+                except ValueError:
+                    raise ValueError('I think, I forgot something')
+                    # print('ValueError')
+            else:
+                self.ids.rv.data.append({
+                    'viewclass': "CustomTwoLineAvatarIconListItem",
+                    'text': item,
+                    # 'secondary_text': str(user_data[item].cords),
+                    'secondary_text': user_data[item].full_address,
+                    # 'left_icon': 'plus',
+                    # 'right_icon': 'pencil'
+                })
+                self.contents.append(item)
+        if self.edited_item is not None:
+            pass
+
+    def on_enter(self):
+        if self.deletion_list:
+            for item in self.deletion_list:
+                try:
+                    ind = self.contents.index(item)
+                    self.ids.rv.data.pop(ind)
+                    self.contents.remove(item)
+                except ValueError:
+                    raise ValueError("Don't you think you forgot something")
+            self.deletion_list = []
+
+        data: list = []
+        if self.first_load:
+            data.extend(user_data.get_keys())
+            self.first_load = False
+        if self.item_to_add:
+            data.extend(self.item_to_add.copy())
+            self.item_to_add = []
+
+        for item in set(data):
+            self.ids.rv.data.append({
+                'viewclass': "CustomTwoLineAvatarIconListItem",
+                'text': item,
+                'secondary_text': user_data[item].full_address,
+            })
+            self.contents.append(item)
+        if self.contents:
+            self.ids['tmp_text'].text = ''
+        else:
+            self.ids['tmp_text'].text = 'Saved locations will appear here'
+
+    @staticmethod
+    def add_item(text):
+        home: HomeScreen = screens.get_screen('home')
+        home.ids['alarm_tab'].add_saved_alarm(text)
+        ok = MDRaisedButton(text='Ok')
+        dialog_type_1('Item added',
+                      'Item added successfully',
+                      [ok])
+
+    @staticmethod
+    def edit_item(text):
+        screen: SavedItemEditScreen = screens.get_screen('edit_item')
+        screen.edit_item(text)
+
+        change_screen_to('edit_item')
+
 
 class AddNewLocationScreen(MDScreen):
     # Provides interface to add new location
@@ -1107,6 +1410,13 @@ class AddNewLocationScreen(MDScreen):
         super().__init__(args, **kwargs)
         self.drop_down_menu = None
         self.post_proc_arg = None
+
+        self.__short_name_dialog: None | MDDialog = None
+
+        button = MDRectangleFlatIconButton(text='Add', icon='plus')
+        button.bind(on_release=lambda *x: self.open_short_address_dialog())
+
+        self.ids['bottom_button'].add_widget(button)
 
     def on_enter(self):
         self.ids['ess_content'].refresh_week_buttons()
@@ -1123,11 +1433,12 @@ class AddNewLocationScreen(MDScreen):
             #     raise KeyError
             # lat, lng = out[0], out[1]
             out = validate_gps_co_ords(txt)
-            self.ids['cords_in'].error = not out  # Not-Out yeahhh  🏏🥳
+            self.ids['cords_in'].error = not out  # Not-Out yeahhh.  🏏🥳
             return out
         except (KeyError, TypeError, ValueError) as e:
             print('Error while validating gps cords')
             print(e)
+        self.ids['cords_in'].helper_text = 'Invalid GPS co-ordinates'
         self.ids['cords_in'].error = True
         return False
 
@@ -1156,14 +1467,14 @@ class AddNewLocationScreen(MDScreen):
                     Clock.schedule_once(self.post_process_text, 0.0)
                     if is_cached:  # if the data is retrieved from cache, then quickly enable the button
                         self.ids['get_button'].kill_all_threads()
+                except GeocoderUnavailable:
+                    self.ids['location_name'].helper_text = 'No Internet!'
+                    self.ids['location_name'].error = True
                 except ValueError:
                     # we're already tested this while validating, and probably never called
                     dialog_type_1(title='Something went wrong',
                                   msg='Something unexpected happened while phrasing co-ordinates, please try again',
                                   buttons=MDFlatButton(text='ok'))
-                except GeocoderUnavailable:
-                    self.ids['location_name'].helper_text = 'No Internet!'
-                    self.ids['location_name'].error = True
             else:
                 self.ids['get_button'].kill_all_threads()
         else:
@@ -1217,19 +1528,198 @@ class AddNewLocationScreen(MDScreen):
             text = text[:15]
         return text
 
-    def open_short_address_dialog(self):
-        cancel = MDFlatButton(text='Cancel')
-        add = MDRaisedButton(text='Add')
+    def reset(self):
+        self.ids['cords_in'].text = ''
+        self.ids['location_name'].text = ''
+        self.ids['ess_content'].ids['week_buttons'].reset_buttons()
+
+    def open_short_address_dialog(self, extra_bind: Callable = None, button_text: str = None):
+        # callable and button_text functionality is added to support editing
         txt: str = self.ids['location_name'].text
+
+        if not self.validate_gps_cords():
+            if self.ids['cords_in'].text.strip():
+                self.ids['cords_in'].helper_text = 'Invalid GPS co-ordinates'
+            else:
+                self.ids['cords_in'].helper_text = 'This field is required'
+            self.ids['cords_in'].error = True
+            self.ids['scroll_container'].scroll_to(self.ids['cords_in'])
+            return
         if not txt.strip():
             self.ids['location_name'].helper_text = 'This field is required'
             self.ids['location_name'].error = True
+            self.ids['scroll_container'].scroll_to(self.ids['location_name'])
             return
+
+        def validate_short_name():
+            nonlocal self
+            widget = self.__short_name_dialog.content_cls.ids['text_field']
+
+            if widget.text == '':
+                widget.text = self.format_short_name(txt)
+            else:
+                self.__short_name_dialog.dismiss()
+
+        cancel = MDFlatButton(text='Cancel')
+        if button_text is not None:
+            add = MDRaisedButton(text=button_text)
+        else:
+            add = MDRaisedButton(text='Add')
+
+        add.bind(on_release=self.save_data)
+        add.bind(on_release=lambda *x: validate_short_name())
+        if extra_bind is not None:
+            add.bind(on_release=lambda *x: extra_bind())
+
+        # add.bind(on_release=lambda *x: self.reset())
+
         txt = self.format_short_name(txt)
-        text_input_dialog(title='Add short name',
-                          hint_text='Short name',
-                          filler_text=txt,
-                          buttons=[cancel, add])
+        self.__short_name_dialog = text_input_dialog(title='Add short name',
+                                                     hint_text='Short name',
+                                                     filler_text=txt,
+                                                     buttons=[cancel, add],
+                                                     dismissible=True)
+        cancel.bind(on_press=lambda x: self.__short_name_dialog.dismiss())
+
+    def save_data(self, *_):
+        input_cords: str | None = self.ids['cords_in'].text  # also save the user entered format
+        cords: tuple[float: 2] = split_lat_lng(self.ids['cords_in'].text)  # already validated
+        location_name: str = self.ids['location_name'].text
+        short_name: str = self.__short_name_dialog.content_cls.ids['text_field'].text
+        active_weeks: list[str] = self.ids['ess_content'].ids['week_buttons'].get_active()
+        sound: bool = self.ids['ess_content'].ids['sound_checkbox'].active
+        vibrate: bool = self.ids['ess_content'].ids['vibrate_checkbox'].active
+        radius: float = float(self.ids['ess_content'].ids['dist_inp'].text) * self.ids['ess_content'].dist_multiplier
+        sound_file: str = self.ids['sound_file'].file_name
+
+        index = 0
+        for index, match in enumerate(regex_match_gps(input_cords)):
+            if match:
+                break
+        if index >= 2:
+            input_cords = None
+
+        user_data.add_new_data(full_address=location_name,
+                               short_name=short_name,
+                               input_cords=input_cords,
+                               cords=cords,
+                               active_weeks=active_weeks,
+                               is_sound=sound,
+                               is_vibrate=vibrate,
+                               radius=radius,
+                               sound_file=sound_file)
+
+        # data = {  # _todo: key parity check
+        #     'input-cords': input_cords,
+        #     'cords': cords,
+        #     'full-name': location_name,
+        #     'sort-name': short_name,
+        #     'active-weeks': active_weeks,
+        #     'sound': sound,
+        #     'vibrate': vibrate,
+        #     'radius': radius,
+        #     'sound-file': sound_file
+        # }
+        # print(data)
+        # if short_name in user_data.keys:
+        #     new_short_name = short_name + ' (1)'
+        #     i = 2  # 2 is correct
+        #     keys = set(user_data.keys)
+        #     while new_short_name in keys:  # O(n) linear, no worries (probably)
+        #         # short_name = short_name.replace(f'({i})', f'({i + 1})')
+        #         new_short_name = short_name + f' ({i})'
+        #         i += 1
+        # user_data[short_name] = data
+
+        saved_locations: SavedLocationsScreen = screens.get_screen('saved_locations')
+        saved_locations.item_to_add.append(short_name)
+
+        self.reset()
+
+
+class SavedItemEditScreen(AddNewLocationScreen):
+    """
+    I wanted to "AddNewLocationScreen" like class but not the class itself
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.ids['bottom_button'].clear_widgets()
+        self.key: None | str = None
+
+        save = MDRectangleFlatIconButton(text='Save', icon='content-save',
+                                         md_bg_color=app.theme_cls.primary_color,
+                                         text_color=app.theme_cls.text_color,
+                                         icon_color=app.theme_cls.icon_color)
+        delete = MDRectangleFlatIconButton(text='Delete',
+                                           icon='delete',
+                                           line_color=(1, 0.2, 0.2), text_color=(1, 0.2, 0.2), icon_color=(1, 0.2, 0.2))
+
+        save.bind(on_release=self.save)
+        delete.bind(on_release=self.open_deletion_confirmation_dialog)
+
+        self.ids['bottom_button'].add_widget(delete)
+        self.ids['bottom_button'].add_widget(save)
+
+    def on_enter(self):
+        pass  # WARNING: DO NOT remove this code (for more info check its parent)
+
+    def edit_item(self, key: str):
+        full_address = user_data[key].full_address
+        # short_name = user_data[key].short_name
+        weeks = user_data[key].active_weeks
+        cords = user_data[key].cords
+        input_cords = user_data[key].input_cords
+        music_file = user_data[key].sound_file
+        radius = user_data[key].radius
+        vibrate = user_data[key].is_vibrate
+        sound = user_data[key].is_sound
+
+        self.ids['cords_in'].text = input_cords if input_cords is not None else ', '.join(map(str, cords))
+        self.ids['location_name'].text = full_address
+        if music_file is None:
+            music_file = 'Song.mp3'  # _todo: change the default file name
+        self.ids['sound_file'].text = music_file
+
+        self.ids['ess_content'].ids['sound_checkbox'].active = sound
+        self.ids['ess_content'].ids['vibrate_checkbox'].active = vibrate
+        # self.ids['ess_content'].ids['m_km_button'].text =
+        self.ids['ess_content'].ids['dist_inp'].text = str(radius)
+
+        self.ids['ess_content'].ids['week_buttons'].set_active(weeks)
+
+        self.key = key
+
+        # screens.set_screen('edit_item')
+
+    def save(self, *_):
+        # Actual data saving already happens at parent class, no need to save here
+        self.open_short_address_dialog(extra_bind=self.__change_screen, button_text='Save')
+
+    def __change_screen(self):
+        self.delete()
+        change_screen_to(previous_screen)
+
+    def delete(self, *_):
+        try:
+            saved_locations: SavedLocationsScreen = screens.get_screen('saved_locations')
+            saved_locations.deletion_list.append(self.key)
+            del user_data[self.key]
+        except KeyError:
+            # this is already deleted
+            change_screen_to(previous_screen)
+
+    def open_deletion_confirmation_dialog(self, *_):
+        yes = MDRaisedButton(text='Delete', md_bg_color=(1, 0.1, 0.1), text_color=app.theme_cls.text_color)
+        no = MDFlatButton(text='Cancel')
+
+        yes.bind(on_release=self.delete)
+        yes.bind(on_release=lambda *x: change_screen_to(previous_screen))
+
+        dialog_type_1(title='Confirm delete!',
+                      msg="Are you sure you want to delete, this process can't be un-done",
+                      buttons=[no, yes])
 
 
 class MyScreenManager:
@@ -1499,6 +1989,10 @@ class MainApp(MDApp):
         # app.theme_cls.bg
         EventLoop.window.bind(on_keyboard=keyboard_listener)
 
+    def on_stop(self):
+        # this function is not triggering
+        user_data.save_data_file()
+
     def build(self):
         self.theme_cls.material_style = 'M3'
         self.theme_cls.theme_style = 'Dark'
@@ -1533,6 +2027,7 @@ if __name__ == '__main__':
     screens.add_screen('new_location', AddNewLocationScreen)
     screens.add_screen('login', PasswordLoginScreen)
     screens.add_screen('signin', PasswordInputScreen)
+    screens.add_screen('edit_item', SavedItemEditScreen)
 
     screens.set_screen('loading')
     screens.get_screen('home')  # preloading home screen
@@ -1555,4 +2050,4 @@ if __name__ == '__main__':
     # sm.current = 'new_location'
 
     # TODO: Make raise_error to False for production, disabled for debugging
-    app.run(raise_error=True)  # platform != 'android')
+    app.run(raise_error=True, on_exit_callback=save_user_data)  # platform != 'android')

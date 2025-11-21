@@ -224,7 +224,7 @@ class SecreteData:
             with open(Constants.SECRETS_FILE_NAME, 'w+') as file:
                 json.dump(self.__data, file, indent=' ' * 4, separators=(',', ': '))
         except OSError:
-            raise SaveFailedException('Unable to save  "secrets" file')
+            raise SaveFailedException('Unable to save "secrets" file')
 
     @property
     def data(self):
